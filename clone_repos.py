@@ -20,7 +20,9 @@ def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: boo
     local_repo_path = os.path.join(dest, repo)
     if not force and os.path.exists(local_repo_path):
         # if verbose: print(f"Skipping {repo}, already exists")
+        updates["successfully_cloned"] = "Already exists"
         return 
+
     if verbose: print(f"Cloning {repo}")
     proc = subprocess.run(
         ["git", "clone", "--depth", "1", f"https://github.com/{repo}", local_repo_path],
