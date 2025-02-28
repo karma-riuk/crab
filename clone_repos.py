@@ -229,40 +229,7 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
             container.kill()
             container.remove()
 
-def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
-    """
-    Download the repos listed in the file passed as argument. The downloaded repos will be placed in the folder that is named as the dest argument.
-
-
-    Arguments:
-        file (str): The name of the file to download the repos from. Must be a .csv.gz file (downloaded from https://seart-ghs.si.usi.ch)
-        dest (str): The name of the root directory in which to download the repos
-        verbose (bool): If `True`, outputs detailed process information. Defaults to `False`.
-    """
-    if verbose: print(f"Reading CSV file {file}")
-    df = pd.read_csv(file)
-
-    # drop all columns besides the name
-    df = df[["name"]]
-
-    updates_list = []  # Collect updates in a list
-    client = docker.from_env()
-
-    good_repos = 0
-    try:
-        if verbose: print("Processing repositories")
-        with tqdm(total=len(df)) as pbar:
-            for i, row in df.iterrows():
-                updates = process_row(row["name"], client, dest, force=force, verbose=verbose)
-                pbar.set_postfix({"repo": row["name"], "good_repos": good_repos})
-                if "good_repo_for_crab" in updates and updates["good_repo_for_crab"]:
-                    good_repos += 1
-                pbar.update(1)
-                updates_list.append((i, updates))  # Collect updates
-    except KeyboardInterrupt:
-        print("Keyboard interrupt detected. Stopping the processing of the repos...")
-
-
+def save_df_with_updates(df, updates_list, verbose=False):
     # Create columns for the new data
     df = df.assign(
         cloned_successfully=None,
@@ -287,6 +254,45 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
 
     if verbose: print("Writing results...")
     df.to_csv("results.csv", index=False)
+
+def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
+    """
+    Download the repos listed in the file passed as argument. The downloaded repos will be placed in the folder that is named as the dest argument.
+
+
+    Arguments:
+        file (str): The name of the file to download the repos from. Must be a .csv.gz file (downloaded from https://seart-ghs.si.usi.ch)
+        dest (str): The name of the root directory in which to download the repos
+        verbose (bool): If `True`, outputs detailed process information. Defaults to `False`.
+    """
+    if verbose: print(f"Reading CSV file {file}")
+    df = pd.read_csv(file)
+
+    # drop all columns besides the name
+    df = df[["name"]]
+
+    updates_list = []  # Collect updates in a list
+    client = docker.from_env()
+
+    good_repos = 0
+    try:
+        if verbose: print("Processing repositories")
+        with tqdm(total=len(df)) as pbar:
+            for i, row in df.iterrows():
+                pbar.set_postfix({"repo": row["name"], "good_repos": good_repos})
+                updates = {}
+                updates_list.append((i, updates))  # Collect updates
+                process_row(row["name"], client, dest, updates, force=force, verbose=verbose)
+                if "good_repo_for_crab" in updates and updates["good_repo_for_crab"]:
+                    good_repos += 1
+                pbar.update(1)
+    except KeyboardInterrupt:
+        print("Interrupted by user, saving progress...")
+        save_df_with_updates(df, updates_list, verbose=verbose)
+    except Exception as e:
+        print("An error occured, saving progress and then raising the error...")
+        save_df_with_updates(df, updates_list, verbose=verbose)
+        raise e
 
 
 if __name__ == "__main__":
