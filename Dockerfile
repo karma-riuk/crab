@@ -22,3 +22,5 @@ RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
     sdk install java 21.0.2-open && \
     sdk install java 23-open && \
     sdk default java 23-open"
+
+WORKDIR /repo
