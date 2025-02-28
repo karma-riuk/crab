@@ -1,5 +1,5 @@
 import pandas as pd
-import argparse, os, sys, subprocess
+import argparse, os, sys, subprocess, docker
 from tqdm import tqdm
 import shutil
 
@@ -118,47 +118,121 @@ def remove_dir(dir: str) -> None:
     if os.listdir(parent) == []:
         shutil.rmtree(parent)
 
+def create_docker_container(client):
+    container = client.containers.run(
+        image="crab-java-env",
+        command="tail -f /dev/null",
+        detach=True,
+        tty=True
+    )
+    return container
 
-def process_row(row, dest: str, force: bool = False, verbose: bool = False) -> dict:
-    updates = {}  # Dictionary to store updates
-    with tqdm(total=3, leave=False) as pbar:
-        repo = row["name"]
-        if repo in EXCLUSION_LIST:
-            updates["error_msg"] = "Repo in exclusion list"
-            if verbose: print(f"Skipping {repo}, in exclusion list")
-            return updates
+def execute_in_container(container, command):
+    exec_result = container.exec_run(command, stream=True)
+    output = "".join([line.decode() for line in exec_result.output])
+    return exec_result.exit_code, output
 
-        pbar.set_postfix_str("Cloning...")
-        if force:
-            clone(repo, dest, updates, verbose=verbose)
-        pbar.update(1)
+def compile_repo(build_file: str, container, updates: dict) -> bool:
+    """
+    Attempts to compile a repository inside a running Docker container.
+    """
+    if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
+        build_cmd = "mvn clean compile"
+    elif build_file.endswith("build.gradle"):
+        build_cmd = "gradle compileJava"
+    else:
+        updates["error_msg"] = "Unsupported build system for compiling: " + build_file
+        return False
+    
+    exit_code, output = execute_in_container(container, build_cmd)
+    if exit_code != 0:
+        updates["compiled_successfully"] = False
+        updates["error_msg"] = output
+        return False
+    
+    updates["compiled_successfully"] = True
+    return True
 
-        repo_path = os.path.join(dest, repo)
-        if not os.path.exists(repo_path):
-            updates["error_msg"] = "Repo not cloned"
-            return updates
+def test_repo(build_file: str, container, updates: dict) -> bool:
+    if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
+        test_cmd = "mvn clean compile"
+    elif build_file.endswith("build.gradle"):
+        test_cmd = "gradle compileJava"
+    else:
+        updates["error_msg"] = "Unsupported build system for testing: " + build_file
+        return False
+    
+    exit_code, output = execute_in_container(container, test_cmd)
+    if exit_code != 0:
+        updates["tested_successfully"] = False
+        updates["error_msg"] = output
+        return False
+    
+    updates["tested_successfully"] = True
+    updates["error_msg"] = output
 
-        pbar.set_postfix_str("Getting build file...")
-        build_file = get_build_file(dest, repo, updates)
-        if build_file is None:
-            if verbose: print(f"Removing {repo}, no build file")
-            remove_dir(repo_path)
-            return updates
-        pbar.update(1)
-        
+    return True
 
-        pbar.set_postfix_str("Checking for tests...")
-        if not has_tests(repo_path, build_file, updates):
-            if verbose: print(f"Removing {repo}, no test suites")
-            remove_dir(repo_path)
-            return updates
-        if verbose: print(f"Keeping {repo}")
-        pbar.update(1)
 
-        # Check for compilation and tests
+def process_row(repo, client, dest: str, force: bool = False, verbose: bool = False) -> dict:
+    updates = {}
+    container = create_docker_container(client)
 
-        # If repo was not removed, then it is a good repo
-        updates["good_repo_for_crab"] = True
+    try: 
+        with tqdm(total=5, leave=False) as pbar:
+            if repo in EXCLUSION_LIST:
+                updates["error_msg"] = "Repo in exclusion list"
+                if verbose: print(f"Skipping {repo}, in exclusion list")
+                return updates
+
+            pbar.set_postfix_str("Cloning...")
+            if force:
+                clone(repo, dest, updates, verbose=verbose)
+            pbar.update(1)
+
+            repo_path = os.path.join(dest, repo)
+            if not os.path.exists(repo_path):
+                updates["error_msg"] = "Repo not cloned"
+                return updates
+
+            pbar.set_postfix_str("Getting build file...")
+            build_file = get_build_file(dest, repo, updates)
+            if build_file is None:
+                if verbose: print(f"Removing {repo}, no build file")
+                remove_dir(repo_path)
+                return updates
+            pbar.update(1)
+            
+            pbar.set_postfix_str("Checking for tests...")
+            if not has_tests(repo_path, build_file, updates):
+                if verbose: print(f"Removing {repo}, no test suites")
+                remove_dir(repo_path)
+                return updates
+            if verbose: print(f"Keeping {repo}")
+            pbar.update(1)
+
+            pbar.set_postfix_str("Compiling...")
+            compiled = compile_repo(build_file, container, updates)
+            if not compiled:
+                if verbose: print(f"Removing {repo}, failed to compile")
+                remove_dir(repo_path)
+                return updates
+            pbar.update(1)
+
+            pbar.set_postfix_str("Runing tests...")
+            compiled = test_repo(build_file, container, updates)
+            if not compiled:
+                if verbose: print(f"Removing {repo}, failed to compile")
+                remove_dir(repo_path)
+                return updates
+            pbar.update(1)
+
+
+            # If repo was not removed, then it is a good repo
+            updates["good_repo_for_crab"] = True
+    finally:
+        container.kill()
+        container.remove()
     return updates
 
 def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
@@ -178,13 +252,14 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
     df = df[["name"]]
 
     updates_list = []  # Collect updates in a list
+    client = docker.from_env()
 
     good_repos = 0
     try:
         if verbose: print("Processing repositories")
         with tqdm(total=len(df)) as pbar:
             for i, row in df.iterrows():
-                updates = process_row(row, dest, force=force, verbose=verbose)
+                updates = process_row(row["name"], client, dest, force=force, verbose=verbose)
                 if "good_repo_for_crab" in updates and updates["good_repo_for_crab"]:
                     good_repos += 1
                 pbar.update(1)
@@ -200,13 +275,15 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
         build_system=None,
         depth_of_build_file=None,
         detected_source_of_tests=None,
-        error_msg=None,
-        good_repo_for_crab=False,
+        compiled_successfully=None,
+        tested_successfully=None,
         n_tests=None,
         n_tests_with_grep=None,
         n_tests_passed=None,
         n_tests_failed=None,
-        n_tests_skipped=None
+        n_tests_skipped=None,
+        good_repo_for_crab=False,
+        error_msg=None,
     )
 
    # Set the new data
