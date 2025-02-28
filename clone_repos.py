@@ -2,8 +2,6 @@ import pandas as pd
 import argparse, os, sys, subprocess
 from tqdm import tqdm
 import shutil
-from pandarallel import pandarallel
-import multiprocessing
 
 tqdm.pandas()
 
@@ -129,8 +127,6 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
         dest (str): The name of the root directory in which to download the repos
         verbose (bool): If `True`, outputs detailed process information. Defaults to `False`.
     """
-    pandarallel.initialize(nb_workers=min(50, multiprocessing.cpu_count()-1), progress_bar=True, verbose=2 if verbose else 0)
-
     if verbose: print(f"Reading CSV file {file}")
     df = pd.read_csv(file)
 
