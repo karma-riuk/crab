@@ -118,15 +118,6 @@ def remove_dir(dir: str) -> None:
     if os.listdir(parent) == []:
         shutil.rmtree(parent)
 
-def create_docker_container(client):
-    container = client.containers.run(
-        image="crab-java-env",
-        command="tail -f /dev/null",
-        detach=True,
-        tty=True
-    )
-    return container
-
 def execute_in_container(container, command):
     exec_result = container.exec_run(command, stream=True)
     output = "".join([line.decode() for line in exec_result.output])
@@ -174,49 +165,54 @@ def test_repo(build_file: str, container, updates: dict) -> bool:
     return True
 
 
-def process_row(repo, client, dest: str, force: bool = False, verbose: bool = False) -> dict:
-    updates = {}
-    container = create_docker_container(client)
+def process_row(repo, client, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
+    with tqdm(total=5, leave=False) as pbar:
+        if repo in EXCLUSION_LIST:
+            updates["error_msg"] = "Repo in exclusion list"
+            if verbose: print(f"Skipping {repo}, in exclusion list")
+            return
 
-    try: 
-        with tqdm(total=5, leave=False) as pbar:
-            if repo in EXCLUSION_LIST:
-                updates["error_msg"] = "Repo in exclusion list"
-                if verbose: print(f"Skipping {repo}, in exclusion list")
-                return updates
+        pbar.set_postfix_str("Cloning...")
+        if force:
+            clone(repo, dest, updates, verbose=verbose)
+        pbar.update(1)
 
-            pbar.set_postfix_str("Cloning...")
-            if force:
-                clone(repo, dest, updates, verbose=verbose)
-            pbar.update(1)
+        repo_path = os.path.join(dest, repo)
+        if not os.path.exists(repo_path):
+            updates["error_msg"] = "Repo not cloned"
+            return
 
-            repo_path = os.path.join(dest, repo)
-            if not os.path.exists(repo_path):
-                updates["error_msg"] = "Repo not cloned"
-                return updates
+        pbar.set_postfix_str("Getting build file...")
+        build_file = get_build_file(dest, repo, updates)
+        if build_file is None:
+            if verbose: print(f"Removing {repo}, no build file")
+            remove_dir(repo_path)
+            return
+        pbar.update(1)
+        
+        pbar.set_postfix_str("Checking for tests...")
+        if not has_tests(repo_path, build_file, updates):
+            if verbose: print(f"Removing {repo}, no test suites")
+            remove_dir(repo_path)
+            return
+        if verbose: print(f"Keeping {repo}")
+        pbar.update(1)
 
-            pbar.set_postfix_str("Getting build file...")
-            build_file = get_build_file(dest, repo, updates)
-            if build_file is None:
-                if verbose: print(f"Removing {repo}, no build file")
-                remove_dir(repo_path)
-                return updates
-            pbar.update(1)
-            
-            pbar.set_postfix_str("Checking for tests...")
-            if not has_tests(repo_path, build_file, updates):
-                if verbose: print(f"Removing {repo}, no test suites")
-                remove_dir(repo_path)
-                return updates
-            if verbose: print(f"Keeping {repo}")
-            pbar.update(1)
+        container = client.containers.run(
+            image="crab-java-env",
+            command="tail -f /dev/null",
+            volumes={os.path.abspath(repo_path): {"bind": "/repo", "mode": "rw"}},
+            detach=True,
+            tty=True
+        )
 
+        try: 
             pbar.set_postfix_str("Compiling...")
             compiled = compile_repo(build_file, container, updates)
             if not compiled:
                 if verbose: print(f"Removing {repo}, failed to compile")
                 remove_dir(repo_path)
-                return updates
+                return
             pbar.update(1)
 
             pbar.set_postfix_str("Runing tests...")
@@ -224,16 +220,14 @@ def process_row(repo, client, dest: str, force: bool = False, verbose: bool = Fa
             if not compiled:
                 if verbose: print(f"Removing {repo}, failed to compile")
                 remove_dir(repo_path)
-                return updates
+                return
             pbar.update(1)
-
 
             # If repo was not removed, then it is a good repo
             updates["good_repo_for_crab"] = True
-    finally:
-        container.kill()
-        container.remove()
-    return updates
+        finally:
+            container.kill()
+            container.remove()
 
 def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
     """
