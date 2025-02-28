@@ -20,7 +20,7 @@ def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: boo
     local_repo_path = os.path.join(dest, repo)
     if not force and os.path.exists(local_repo_path):
         # if verbose: print(f"Skipping {repo}, already exists")
-        updates["successfully_cloned"] = "Already exists"
+        updates["cloned_successfully"] = "Already exists"
         return 
 
     if verbose: print(f"Cloning {repo}")
@@ -30,14 +30,14 @@ def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: boo
         stderr=subprocess.PIPE
     )
     if proc.returncode != 0:
-        updates["successfully_cloned"] = False
+        updates["cloned_successfully"] = False
         print(f"Failed to clone {repo}", file=sys.stderr)
         print(f"Error message was:", file=sys.stderr)
         error_msg = proc.stderr.decode()
         print(error_msg, file=sys.stderr)
         updates["error_msg"] = error_msg
     else:
-        updates["successfully_cloned"] = True
+        updates["cloned_successfully"] = True
 
 def get_build_file(root: str, repo: str, updates: dict, verbose: bool = False):
     """
@@ -196,7 +196,7 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
 
     # Create columns for the new data
     df = df.assign(
-        successfully_cloned=None,
+        cloned_successfully=None,
         build_system=None,
         depth_of_build_file=None,
         detected_source_of_tests=None,
