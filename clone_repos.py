@@ -117,6 +117,38 @@ def remove_dir(dir: str) -> None:
         shutil.rmtree(parent)
 
 
+def process_row(row, dest: str, force: bool = False, verbose: bool = False):
+    repo = row["name"]
+    if repo in EXCLUSION_LIST:
+        row["error_msg"] = "Repo in exclusion list"
+        if verbose: print(f"Skipping {repo}, in exclusion list")
+        return
+
+    if force:
+        clone(repo, dest, row, verbose=verbose)
+
+    repo_path = os.path.join(dest, repo)
+    if not os.path.exists(repo_path):
+        row["error_msg"] = "Repo not cloned"
+        return
+
+    build_file = get_build_file(dest, repo, row)
+    if build_file is None:
+        if verbose: print(f"Removing {repo}, no build file")
+        remove_dir(repo_path)
+        return
+    
+    if not has_tests(repo_path, build_file, row):
+        if verbose: print(f"Removing {repo}, no test suites")
+        remove_dir(repo_path)
+        return
+    # if verbose: print(f"Keeping {repo}")
+
+    # Check for compilation and tests
+
+    # If repo was not removed, then it is a good repo
+    row["good_repo_for_crab"] = True
+
 def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
     """
     Download the repos listed in the file passed as argument. The downloaded repos will be placed in the folder that is named as the dest argument.
@@ -142,46 +174,13 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
     df["n_tests_failed"] = None
     df["n_tests_skipped"] = None
 
-    if verbose: print("Cloning repositories")
-    def _process(row)->None:
-        repo = row["name"]
-        if repo in EXCLUSION_LIST:
-            row["error_msg"] = "Repo in exclusion list"
-            if verbose: print(f"Skipping {repo}, in exclusion list")
-            return
-
-        if force:
-            clone(repo, dest, row, verbose=verbose)
-
-        repo_path = os.path.join(dest, repo)
-        if not os.path.exists(repo_path):
-            row["error_msg"] = "Repo not cloned"
-            return
-
-        build_file = get_build_file(dest, repo, row)
-        if build_file is None:
-            if verbose: print(f"Removing {repo}, no build file")
-            remove_dir(repo_path)
-            return
-        
-        if not has_tests(repo_path, build_file, row):
-            if verbose: print(f"Removing {repo}, no test suites")
-            remove_dir(repo_path)
-            return
-        # if verbose: print(f"Keeping {repo}")
-
-        # Check for compilation and tests
-
-        # If repo was not removed, then it is a good repo
-        row["good_repo_for_crab"] = True
-
-
     try:
-        df.progress_apply(_process, axis=1)
+        if verbose: print("Processing repositories")
+        df.progress_apply(lambda row: process_row(row, dest, force=force, verbose=verbose), axis=1)
     except KeyboardInterrupt:
         print("Keyboard interrupt detected. Stopping the processing of the repos...")
 
-    if verbose: print("Writing CSV file")
+    if verbose: print("Writing results...")
     df.to_csv("results.csv.gz", index=False)
 
 
