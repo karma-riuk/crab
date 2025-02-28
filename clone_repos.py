@@ -11,7 +11,7 @@ EXCLUSION_LIST = [
     "edmcouncil/idmp",
 ]
 
-def clone(repo: str, dest: str, force: bool = False, verbose: bool = False) -> None:
+def clone(repo: str, dest: str, row: pd.Series, force: bool = False, verbose: bool = False) -> None:
     """
     Clones a GitHub repository into a local directory.
 
@@ -30,11 +30,16 @@ def clone(repo: str, dest: str, force: bool = False, verbose: bool = False) -> N
         stderr=subprocess.PIPE
     )
     if proc.returncode != 0:
+        row["successfully_cloned"] = False
         print(f"Failed to clone {repo}", file=sys.stderr)
         print(f"Error message was:", file=sys.stderr)
-        print(proc.stderr.decode(), file=sys.stderr)
+        error_msg = proc.stderr.decode()
+        print(error_msg, file=sys.stderr)
+        row["error_msg"] = error_msg
+    else:
+        row["successfully_cloned"] = True
 
-def get_build_file(root: str, repo: str, verbose: bool = False):
+def get_build_file(root: str, repo: str, row: pd.Series, verbose: bool = False):
     """
     Get the path to the build file of a repository. The build file is either a
     `pom.xml`, `build.gradle`, or `build.xml` file.
@@ -49,13 +54,16 @@ def get_build_file(root: str, repo: str, verbose: bool = False):
     path = os.path.join(root, repo)
     # Check if the given path is a directory
     if not os.path.isdir(path):
-        print(f"The path {path} is not a valid directory.", file=sys.stderr)
+        error_msg = f"The path {path} is not a valid directory."
+        print(error_msg, file=sys.stderr)
+        row["error_msg"] = error_msg
         return None
 
     to_keep = ["pom.xml", "build.gradle", "build.xml"]
     for entry in os.scandir(path):
         if entry.is_file() and entry.name in to_keep:
             if verbose: print(f"Found {entry.name} in {repo} root, so keeping it and returning")
+            row["depth_of_build_file"] = 0
             return os.path.join(path, entry.name)
     
     # List files in the immediate subdirectories
@@ -64,27 +72,51 @@ def get_build_file(root: str, repo: str, verbose: bool = False):
             for sub_entry in os.scandir(entry.path):
                 if sub_entry.is_file() and sub_entry.name in to_keep:
                     if verbose: print(f"Found {sub_entry.name} in {repo} first level, so keeping it and returning")
+                    row["depth_of_build_file"] = 1
                     return os.path.join(path, entry.name, sub_entry.name)
-        
+
+    row["error_msg"] = "No build file found"
     return None
 
-def has_tests(path: str, build_file: str) -> bool:
+def has_tests(path: str, build_file: str, row: pd.Series) -> bool:
     with open(build_file, "r") as f:
         content = f.read()
-        if any(lib in content for lib in ["junit", "testng", "mockito"]):
-            return True
-        if any(keyword in content for keyword in ["testImplementation", "functionalTests", "bwc_tests_enabled"]):
-            return True
+
+        for library in ["junit", "testng", "mockito"]:
+            if library in content:
+                row["detected_source_of_tests"] = library + " library in build file"
+                return True
+
+        for keyword in ["testImplementation", "functionalTests", "bwc_tests_enabled"]:
+            if keyword in content:
+                row["detected_source_of_tests"] = keyword + " keyword in build file"
+                return False
+
     test_dirs = [
         "src/test/java",
         "src/test/kotlin",
         "src/test/groovy",
         "test",
     ]
-    if any(os.path.exists(os.path.join(path, td)) for td in test_dirs):
-        return True
+    for td in test_dirs:
+        if os.path.exists(os.path.join(path, td)):
+            row["detected_source_of_tests"] = td + " dir exists in repo"
+            return True
 
+    row["error_msg"] = "No tests found"
     return False
+
+def remove_dir(dir: str) -> None:
+    """
+    Removes a directory and all its contents. Removes parent directorie if it is empty after removing child (dir).
+
+    Args:
+        dir (str): The directory to remove.
+    """
+    shutil.rmtree(dir)
+    parent = os.path.abspath(os.path.join(dir, os.path.pardir))
+    if os.listdir(parent) == []:
+        shutil.rmtree(parent)
 
 
 def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
@@ -102,36 +134,44 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
     if verbose: print(f"Reading CSV file {file}")
     df = pd.read_csv(file)
 
+    df["successfully_cloned"] = None
+    df["build_system"] = None
+    df["depth_of_build_file"] = None
+    df["detected_source_of_tests"] = None
+    df["error_msg"] = None
+
     if verbose: print("Cloning repositories")
-    def _process(repo: str)->None:
+    def _process(row)->None:
+        repo = row["name"]
         if repo in EXCLUSION_LIST:
-            print(f"Skipping {repo}, in exclusion list")
+            row["error_msg"] = "Repo in exclusion list"
+            if verbose: print(f"Skipping {repo}, in exclusion list")
             return
 
         if force:
-            clone(repo, dest, verbose=verbose)
+            clone(repo, dest, row, verbose=verbose)
 
         repo_path = os.path.join(dest, repo)
         if not os.path.exists(repo_path):
+            row["error_msg"] = "Repo not cloned"
             return
 
-        build_file = get_build_file(dest, repo)
+        build_file = get_build_file(dest, repo, row)
         if build_file is None:
-            print(f"Removing {repo}, no build file")
-            shutil.rmtree(os.path.join(dest, repo))
-            parent = os.path.abspath(os.path.join(dest, repo, os.path.pardir))
-            if os.listdir(parent) == []:
-                print(f"Removing {parent}, no files left")
-                shutil.rmtree(parent)
+            if verbose: print(f"Removing {repo}, no build file")
+            remove_dir(repo_path)
             return
         
-        if not has_tests(repo_path, build_file):
-            print(f"Removing {repo}, no test suites")
-            shutil.rmtree(os.path.join(dest, repo))
+        if not has_tests(repo_path, build_file, row):
+            if verbose: print(f"Removing {repo}, no test suites")
+            remove_dir(repo_path)
             return
         # if verbose: print(f"Keeping {repo}")
 
-    df.name.progress_apply(_process)
+    df.progress_apply(_process, axis=1)
+
+    if verbose: print("Writing CSV file")
+    df.to_csv("results.csv.gz", index=False)
 
 
 if __name__ == "__main__":
