@@ -164,7 +164,16 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
             return
         # if verbose: print(f"Keeping {repo}")
 
-    df.progress_apply(_process, axis=1)
+        # Check for compilation and tests
+
+        # If repo was not removed, then it is a good repo
+        row["good_repo_for_crab"] = True
+
+
+    try:
+        df.progress_apply(_process, axis=1)
+    except KeyboardInterrupt:
+        print("Keyboard interrupt detected. Stopping the processing of the repos...")
 
     if verbose: print("Writing CSV file")
     df.to_csv("results.csv.gz", index=False)
