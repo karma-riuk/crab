@@ -146,11 +146,11 @@ def process_row(row, dest: str, force: bool = False, verbose: bool = False) -> d
         
 
         pbar.set_postfix_str("Checking for tests...")
-        # if not has_tests(repo_path, build_file, updates):
-        #     if verbose: print(f"Removing {repo}, no test suites")
-        #     remove_dir(repo_path)
-        #     return
-        # if verbose: print(f"Keeping {repo}")
+        if not has_tests(repo_path, build_file, updates):
+            if verbose: print(f"Removing {repo}, no test suites")
+            remove_dir(repo_path)
+            return updates
+        if verbose: print(f"Keeping {repo}")
         pbar.update(1)
 
         # Check for compilation and tests
