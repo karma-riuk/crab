@@ -135,6 +135,12 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
     df["depth_of_build_file"] = None
     df["detected_source_of_tests"] = None
     df["error_msg"] = None
+    df["good_repo_for_crab"] = False
+    df["n_tests"] = None
+    df["n_tests_with_grep"] = None
+    df["n_tests_passed"] = None
+    df["n_tests_failed"] = None
+    df["n_tests_skipped"] = None
 
     if verbose: print("Cloning repositories")
     def _process(row)->None:
