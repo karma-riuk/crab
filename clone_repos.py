@@ -260,10 +260,10 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
         with tqdm(total=len(df)) as pbar:
             for i, row in df.iterrows():
                 updates = process_row(row["name"], client, dest, force=force, verbose=verbose)
+                pbar.set_postfix({"repo": row["name"], "good_repos": good_repos})
                 if "good_repo_for_crab" in updates and updates["good_repo_for_crab"]:
                     good_repos += 1
                 pbar.update(1)
-                pbar.set_postfix({"repo": row["name"], "good_repos": good_repos}, refresh=True)
                 updates_list.append((i, updates))  # Collect updates
     except KeyboardInterrupt:
         print("Keyboard interrupt detected. Stopping the processing of the repos...")
