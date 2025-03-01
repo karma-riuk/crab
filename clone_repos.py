@@ -14,7 +14,10 @@ EXCLUSION_LIST = [
 ]
 
 GRADLE_BASE_CMD = "gradle --no-daemon --console=plain"
-MAVEN_BASE_CMD = "mvn -Dstyle.color=never"
+MAVEN_BASE_CMD = "mvn -B -Dstyle.color=never -Dartifact.download.skip=true" 
+# -B (Batch Mode): Runs Maven in non-interactive mode, reducing output and removing download progress bars.
+# -Dstyle.color=never: Disables ANSI colors.
+# -Dartifact.download.skip=true: Prevents Maven from printing download logs (but still downloads dependencies when needed).
 
 def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
     """
