@@ -330,14 +330,17 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
                 if "good_repo_for_crab" in updates and updates["good_repo_for_crab"]:
                     good_repos += 1
                 pbar.update(1)
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
         print("Interrupted by user, saving progress...")
         save_df_with_updates(df, updates_list, verbose=verbose)
+        raise e
     except Exception as e:
         print("An error occured, saving progress and then raising the error...")
         save_df_with_updates(df, updates_list, verbose=verbose)
         raise e
 
+    if verbose: print("Saving results...")
+    save_df_with_updates(df, updates_list, verbose=verbose)
 
 if __name__ == "__main__":
     # whtie the code to parse the arguments here
