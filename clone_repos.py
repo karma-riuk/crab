@@ -171,6 +171,7 @@ def save_df_with_updates(df, updates_list, verbose=False):
         n_tests_with_grep=None,
         n_tests_passed=None,
         n_tests_failed=None,
+        n_tests_errors=None,
         n_tests_skipped=None,
         good_repo_for_crab=None,
         error_msg=None,
