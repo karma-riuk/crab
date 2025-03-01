@@ -69,7 +69,7 @@ def get_build_file(root: str, repo: str, updates: dict, verbose: bool = False):
         updates["error_msg"] = error_msg
         return None
 
-    to_keep = ["pom.xml", "build.gradle", "build.xml"]
+    to_keep = ["pom.xml", "build.gradle"]
     for entry in os.scandir(path):
         if entry.is_file() and entry.name in to_keep:
             if verbose: print(f"Found {entry.name} in {repo} root, so keeping it and returning")
@@ -156,7 +156,7 @@ def compile_repo(build_file: str, container, updates: dict) -> bool:
     """
     Attempts to compile a repository inside a running Docker container.
     """
-    if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
+    if build_file.endswith("pom.xml"):
         build_cmd = f"{MAVEN_BASE_CMD} clean compile"
     elif build_file.endswith("build.gradle"):
         build_cmd = f"{GRADLE_BASE_CMD} compileJava"
@@ -175,7 +175,7 @@ def compile_repo(build_file: str, container, updates: dict) -> bool:
     return True
 
 def test_repo(build_file: str, container, updates: dict) -> bool:
-    if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
+    if build_file.endswith("pom.xml"):
         test_cmd = f"{MAVEN_BASE_CMD} test"
     elif build_file.endswith("build.gradle"):
         test_cmd = f"{GRADLE_BASE_CMD} test"
@@ -196,7 +196,7 @@ def test_repo(build_file: str, container, updates: dict) -> bool:
     return True
 
 def clean_repo(build_file: str, container):
-    if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
+    if build_file.endswith("pom.xml"):
         clean_cmd = f"{MAVEN_BASE_CMD} clean"
     elif build_file.endswith("build.gradle"):
         clean_cmd = f"{GRADLE_BASE_CMD} clean"
