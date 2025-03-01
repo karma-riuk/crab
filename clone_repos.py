@@ -133,6 +133,12 @@ def remove_dir(dir: str) -> None:
     if os.listdir(parent) == []:
         shutil.rmtree(parent)
 
+def clean_output(output: bytes) -> str:
+    output_str = output.decode()
+    def _keep(line):
+        return not (line.startswith("Download") or line.startswith("Progress"))
+    return "\n".join([line for line in output_str.split("\n") if _keep(line)])
+
 def compile_repo(build_file: str, container, updates: dict) -> bool:
     """
     Attempts to compile a repository inside a running Docker container.
@@ -146,7 +152,7 @@ def compile_repo(build_file: str, container, updates: dict) -> bool:
         return False
     
     exec_result = container.exec_run(build_cmd)
-    output = [line for line in exec_result.output.decode().split("\n") if not (line.startswith("Down") or line.startswith("Progress"))]
+    output = clean_output(exec_result.output)
     if exec_result.exit_code != 0:
         updates["compiled_successfully"] = False
         updates["error_msg"] = output
@@ -165,7 +171,7 @@ def test_repo(build_file: str, container, updates: dict) -> bool:
         return False
     
     exec_result = container.exec_run(test_cmd)
-    output = exec_result.output.decode()
+    output = clean_output(exec_result.output)
     if exec_result.exit_code != 0:
         updates["tested_successfully"] = False
         updates["error_msg"] = output
