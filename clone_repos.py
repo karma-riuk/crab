@@ -164,6 +164,15 @@ def test_repo(build_file: str, container, updates: dict) -> bool:
 
     return True
 
+def clean_repo(build_file: str, container):
+    if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
+        clean_cmd = "mvn clean"
+    elif build_file.endswith("build.gradle"):
+        clean_cmd = "gradle clean"
+    else:
+        return
+    
+    container.exec_run(clean_cmd)
 
 def process_row(repo, client, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
     with tqdm(total=5, leave=False) as pbar:
@@ -211,14 +220,16 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
             compiled = compile_repo(build_file, container, updates)
             if not compiled:
                 if verbose: print(f"Removing {repo}, failed to compile")
+                clean_repo(build_file, container)
                 remove_dir(repo_path)
                 return
             pbar.update(1)
 
             pbar.set_postfix_str("Runing tests...")
-            compiled = test_repo(build_file, container, updates)
-            if not compiled:
-                if verbose: print(f"Removing {repo}, failed to compile")
+            tested = test_repo(build_file, container, updates)
+            clean_repo(build_file, container)
+            if not tested:
+                if verbose: print(f"Removing {repo}, failed to run tests")
                 remove_dir(repo_path)
                 return
             pbar.update(1)
