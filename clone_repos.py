@@ -204,11 +204,20 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
     client = docker.from_env()
 
     good_repos = 0
+    last_i_saved = -1
     try:
         if verbose: print("Processing repositories")
         with tqdm(total=len(df)) as pbar:
             for i, row in df.iterrows():
-                pbar.set_postfix({"repo": row["name"], "good_repos": good_repos, "n_gradle": sum(updates["build_system"] == "gradle" for _, updates in updates_list if "build_system" in updates)})
+                if i % 10 == 0:
+                    save_df_with_updates(df, updates_list, verbose=verbose)
+                    last_i_saved = i
+                pbar.set_postfix({
+                    "repo": row["name"],
+                    "# good repos": f"{good_repos} ({good_repos/len(updates_list):.2%})", 
+                    "last index saved": last_i_saved,
+                    "# gradle": sum(updates["build_system"] == "gradle" for _, updates in updates_list if "build_system" in updates)
+                })
                 updates = {}
                 updates_list.append((i, updates))  # Collect updates
                 process_row(row["name"], client, dest, updates, force=force, verbose=verbose)
