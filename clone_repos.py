@@ -193,6 +193,7 @@ def clean_repo(build_file: str, container):
     container.exec_run(clean_cmd)
 
 def process_row(repo, client, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
+    updates["good_repo_for_crab"] = False
     with tqdm(total=5, leave=False) as pbar:
         if repo in EXCLUSION_LIST:
             updates["error_msg"] = "Repo in exclusion list"
@@ -273,7 +274,7 @@ def save_df_with_updates(df, updates_list, verbose=False):
         n_tests_passed=None,
         n_tests_failed=None,
         n_tests_skipped=None,
-        good_repo_for_crab=False,
+        good_repo_for_crab=None,
         error_msg=None,
     )
 
