@@ -1,4 +1,9 @@
-FROM gradle:jdk11-corretto
+FROM gradle:7.5-jdk11
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y curl zip git && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install SDKMAN!
 RUN curl -s "https://get.sdkman.io" | bash

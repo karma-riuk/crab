@@ -3,6 +3,11 @@ FROM maven:3.9.9-eclipse-temurin-11
 # Set Maven repository location
 ENV MAVEN_CONFIG=/root/.m2
 
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y curl zip git && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install SDKMAN!
 RUN curl -s "https://get.sdkman.io" | bash
 
