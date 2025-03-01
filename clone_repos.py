@@ -13,6 +13,9 @@ EXCLUSION_LIST = [
     "aosp-mirror/platform_frameworks_base", # takes ages to clone
 ]
 
+GRADLE_BASE_CMD = "gradle --no-daemon --console=plain"
+MAVEN_BASE_CMD = "mvn -Dstyle.color=never"
+
 def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
     """
     Clones a GitHub repository into a local directory.
@@ -127,9 +130,9 @@ def compile_repo(build_file: str, container, updates: dict) -> bool:
     Attempts to compile a repository inside a running Docker container.
     """
     if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
-        build_cmd = "mvn clean compile"
+        build_cmd = f"{MAVEN_BASE_CMD} clean compile"
     elif build_file.endswith("build.gradle"):
-        build_cmd = "gradle compileJava"
+        build_cmd = f"{GRADLE_BASE_CMD} compileJava"
     else:
         updates["error_msg"] = "Unsupported build system for compiling: " + build_file
         return False
@@ -146,9 +149,9 @@ def compile_repo(build_file: str, container, updates: dict) -> bool:
 
 def test_repo(build_file: str, container, updates: dict) -> bool:
     if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
-        test_cmd = "mvn test"
+        test_cmd = f"{MAVEN_BASE_CMD} test"
     elif build_file.endswith("build.gradle"):
-        test_cmd = "gradle test"
+        test_cmd = f"{GRADLE_BASE_CMD} test"
     else:
         updates["error_msg"] = "Unsupported build system for testing: " + build_file
         return False
@@ -167,9 +170,9 @@ def test_repo(build_file: str, container, updates: dict) -> bool:
 
 def clean_repo(build_file: str, container):
     if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
-        clean_cmd = "mvn clean"
+        clean_cmd = f"{MAVEN_BASE_CMD} clean"
     elif build_file.endswith("build.gradle"):
-        clean_cmd = "gradle clean"
+        clean_cmd = f"{GRADLE_BASE_CMD} clean"
     else:
         return
     
