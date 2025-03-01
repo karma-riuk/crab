@@ -226,7 +226,7 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
                 return
             pbar.update(1)
 
-            pbar.set_postfix_str("Runing tests...")
+            pbar.set_postfix_str("Running tests...")
             tested = test_repo(build_file, container, updates)
             clean_repo(build_file, container)
             if not tested:
