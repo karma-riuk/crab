@@ -1,5 +1,5 @@
 import pandas as pd
-import argparse, os, sys, subprocess, docker
+import argparse, os, sys, subprocess, docker, re
 from tqdm import tqdm
 import shutil
 
@@ -137,10 +137,20 @@ def remove_dir(dir: str) -> None:
         shutil.rmtree(parent)
 
 def clean_output(output: bytes) -> str:
-    output_str = output.decode()
-    def _keep(line):
-        return not (line.startswith("Download") or line.startswith("Progress"))
-    return "\n".join([line for line in output_str.split("\n") if _keep(line)])
+    output_lines = output.decode().split("\n")
+    cleaned_lines = []
+    downloading_block = False
+    
+    for line in output_lines:
+        if re.match(r"\[INFO\] Download(ing|ed) from", line):
+            if not downloading_block:
+                cleaned_lines.append("[CRAB] Downloading stuff")
+                downloading_block = True
+        else:
+            cleaned_lines.append(line)
+            downloading_block = False
+    
+    return "\n".join(cleaned_lines)
 
 def compile_repo(build_file: str, container, updates: dict) -> bool:
     """
