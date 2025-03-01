@@ -71,6 +71,10 @@ def get_build_file(root: str, repo: str, updates: dict, verbose: bool = False):
         if entry.is_file() and entry.name in to_keep:
             if verbose: print(f"Found {entry.name} in {repo} root, so keeping it and returning")
             updates["depth_of_build_file"] = 0
+            if entry.name == "build.gradle":
+                updates["build_system"] = "gradle"
+            else:
+                updates["build_system"] = "maven"
             return os.path.join(path, entry.name)
     
     # List files in the immediate subdirectories
@@ -80,6 +84,10 @@ def get_build_file(root: str, repo: str, updates: dict, verbose: bool = False):
                 if sub_entry.is_file() and sub_entry.name in to_keep:
                     if verbose: print(f"Found {sub_entry.name} in {repo} first level, so keeping it and returning")
                     updates["depth_of_build_file"] = 1
+                    if entry.name == "build.gradle":
+                        updates["build_system"] = "gradle"
+                    else:
+                        updates["build_system"] = "maven"
                     return os.path.join(path, entry.name, sub_entry.name)
 
     updates["error_msg"] = "No build file found"
