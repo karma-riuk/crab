@@ -1,23 +1,17 @@
 import pandas as pd
-import argparse, os, sys, subprocess, docker, re
+import argparse, os, sys, subprocess, docker
 from tqdm import tqdm
 import shutil
+from typing import Optional
+
+from handlers import GradleHandler, MavenHandler, BuildHandler
 
 tqdm.pandas()
-
-USER_ID = os.getuid() # for container user
-GROUP_ID = os.getgid() 
 
 EXCLUSION_LIST = [
     "edmcouncil/idmp", # requires authentication
     "aosp-mirror/platform_frameworks_base", # takes ages to clone
 ]
-
-GRADLE_BASE_CMD = "gradle --no-daemon --console=plain"
-MAVEN_BASE_CMD = "mvn -B -Dstyle.color=never -Dartifact.download.skip=true" 
-# -B (Batch Mode): Runs Maven in non-interactive mode, reducing output and removing download progress bars.
-# -Dstyle.color=never: Disables ANSI colors.
-# -Dartifact.download.skip=true: Prevents Maven from printing download logs (but still downloads dependencies when needed).
 
 def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
     """
@@ -49,7 +43,7 @@ def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: boo
     else:
         updates["cloned_successfully"] = True
 
-def get_build_file(root: str, repo: str, updates: dict, verbose: bool = False):
+def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False) -> Optional[BuildHandler]:
     """
     Get the path to the build file of a repository. The build file is either a
     `pom.xml`, `build.gradle`, or `build.xml` file.
@@ -76,9 +70,10 @@ def get_build_file(root: str, repo: str, updates: dict, verbose: bool = False):
             updates["depth_of_build_file"] = 0
             if entry.name == "build.gradle":
                 updates["build_system"] = "gradle"
+                return GradleHandler(path, entry.name, updates)
             else:
                 updates["build_system"] = "maven"
-            return os.path.join(path, entry.name)
+                return MavenHandler(path, entry.name, updates)
     
     # List files in the immediate subdirectories
     for entry in os.scandir(path):
@@ -89,40 +84,13 @@ def get_build_file(root: str, repo: str, updates: dict, verbose: bool = False):
                     updates["depth_of_build_file"] = 1
                     if entry.name == "build.gradle":
                         updates["build_system"] = "gradle"
+                        return GradleHandler(path, os.path.join(entry.name, sub_entry.name), updates)
                     else:
                         updates["build_system"] = "maven"
-                    return os.path.join(path, entry.name, sub_entry.name)
+                        return MavenHandler(path, os.path.join(entry.name, sub_entry.name), updates)
 
     updates["error_msg"] = "No build file found"
     return None
-
-def has_tests(path: str, build_file: str, updates: dict) -> bool:
-    with open(build_file, "r") as f:
-        content = f.read()
-
-        for library in ["junit", "testng", "mockito"]:
-            if library in content:
-                updates["detected_source_of_tests"] = library + " library in build file"
-                return True
-
-        for keyword in ["testImplementation", "functionalTests", "bwc_tests_enabled"]:
-            if keyword in content:
-                updates["detected_source_of_tests"] = keyword + " keyword in build file"
-                return False
-
-    test_dirs = [
-        "src/test/java",
-        "src/test/kotlin",
-        "src/test/groovy",
-        "test",
-    ]
-    for td in test_dirs:
-        if os.path.exists(os.path.join(path, td)):
-            updates["detected_source_of_tests"] = td + " dir exists in repo"
-            return True
-
-    updates["error_msg"] = "No tests found"
-    return False
 
 def remove_dir(dir: str) -> None:
     """
@@ -135,113 +103,6 @@ def remove_dir(dir: str) -> None:
     parent = os.path.abspath(os.path.join(dir, os.path.pardir))
     if os.listdir(parent) == []:
         shutil.rmtree(parent)
-
-def merge_download_lines(lines: list) -> list:
-    """
-    Merges lines that are part of the same download block in Maven output.
-
-    Args:
-        lines (list): The lines to merge.
-
-    Returns:
-        list: The merged lines.
-    """
-    downloading_block = False
-    cleaned_lines = []
-    for line in lines:
-        if re.match(r"\[INFO\] Download(ing|ed) from", line):
-            if not downloading_block:
-                cleaned_lines.append("[CRAB] Downloading stuff")
-                downloading_block = True
-        else:
-            cleaned_lines.append(line)
-            downloading_block = False
-    return cleaned_lines
-
-def merge_unapproved_licences(lines: list) -> list:
-    """
-    Merges lines that are part of the same unapproved licences block in Maven output.
-
-    Args:
-        lines (list): The lines to merge.
-
-    Returns:
-        list: The merged lines.
-    """
-    licenses_block = False
-    cleaned_lines = []
-    for line in lines:
-        if re.match(r"\[WARNING\] Files with unapproved licenses:", line):
-            cleaned_lines.append(line)
-            cleaned_lines.append("[CRAB] List of all the unapproved licenses...")
-            licenses_block = True
-        elif licenses_block and not re.match(r"\s+\?\/\.m2\/repository", line):
-            licenses_block = False
-
-        if not licenses_block:
-            cleaned_lines.append(line)
-    return cleaned_lines
-
-def clean_output(output: bytes) -> str:
-    output_lines = output.decode().split("\n")
-
-    cleaned_lines = merge_download_lines(output_lines)
-    cleaned_lines = merge_unapproved_licences(cleaned_lines)
-
-    return "\n".join(cleaned_lines)
-
-def compile_repo(build_file: str, container, updates: dict) -> bool:
-    """
-    Attempts to compile a repository inside a running Docker container.
-    """
-    if build_file.endswith("pom.xml"):
-        build_cmd = f"{MAVEN_BASE_CMD} clean compile"
-    elif build_file.endswith("build.gradle"):
-        build_cmd = f"{GRADLE_BASE_CMD} compileJava"
-    else:
-        updates["error_msg"] = "Unsupported build system for compiling: " + build_file
-        return False
-    
-    exec_result = container.exec_run(build_cmd)
-    output = clean_output(exec_result.output)
-    if exec_result.exit_code != 0:
-        updates["compiled_successfully"] = False
-        updates["error_msg"] = output
-        return False
-    
-    updates["compiled_successfully"] = True
-    return True
-
-def test_repo(build_file: str, container, updates: dict) -> bool:
-    if build_file.endswith("pom.xml"):
-        test_cmd = f"{MAVEN_BASE_CMD} test"
-    elif build_file.endswith("build.gradle"):
-        test_cmd = f"{GRADLE_BASE_CMD} test"
-    else:
-        updates["error_msg"] = "Unsupported build system for testing: " + build_file
-        return False
-    
-    exec_result = container.exec_run(test_cmd)
-    output = clean_output(exec_result.output)
-    if exec_result.exit_code != 0:
-        updates["tested_successfully"] = False
-        updates["error_msg"] = output
-        return False
-    
-    updates["tested_successfully"] = True
-    updates["error_msg"] = output
-
-    return True
-
-def clean_repo(build_file: str, container):
-    if build_file.endswith("pom.xml"):
-        clean_cmd = f"{MAVEN_BASE_CMD} clean"
-    elif build_file.endswith("build.gradle"):
-        clean_cmd = f"{GRADLE_BASE_CMD} clean"
-    else:
-        return
-    
-    container.exec_run(clean_cmd)
 
 def process_row(repo, client, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
     updates["good_repo_for_crab"] = False
@@ -261,55 +122,41 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
             updates["error_msg"] = "Repo not cloned"
             return
 
-        pbar.set_postfix_str("Getting build file...")
-        build_file = get_build_file(dest, repo, updates)
-        if build_file is None:
+        pbar.set_postfix_str("Getting build handler...")
+        build_handler = get_build_handler(dest, repo, updates)
+        if build_handler is None:
             if verbose: print(f"Removing {repo}, no build file")
             remove_dir(repo_path)
             return
         pbar.update(1)
-        
-        pbar.set_postfix_str("Checking for tests...")
-        if not has_tests(repo_path, build_file, updates):
-            if verbose: print(f"Removing {repo}, no test suites")
-            remove_dir(repo_path)
-            return
-        if verbose: print(f"Keeping {repo}")
-        pbar.update(1)
 
-        container = client.containers.run(
-            image="crab-java-env",
-            command="tail -f /dev/null",
-            volumes={os.path.abspath(repo_path): {"bind": "/repo", "mode": "rw"}},
-            user=f"{USER_ID}:{GROUP_ID}",
-            detach=True,
-            tty=True
-        )
+        build_handler.set_client(client)
+        with build_handler:
+            pbar.set_postfix_str("Checking for tests...")
+            if not build_handler.has_tests():
+                if verbose: print(f"Removing {repo}, no test suites")
+                remove_dir(repo_path)
+                return
+            if verbose: print(f"Keeping {repo}")
+            pbar.update(1)
 
-        try: 
             pbar.set_postfix_str("Compiling...")
-            compiled = compile_repo(build_file, container, updates)
-            if not compiled:
+            if not build_handler.compile_repo():
                 if verbose: print(f"Removing {repo}, failed to compile")
-                clean_repo(build_file, container)
                 remove_dir(repo_path)
                 return
             pbar.update(1)
 
             pbar.set_postfix_str("Running tests...")
-            tested = test_repo(build_file, container, updates)
-            clean_repo(build_file, container)
-            if not tested:
+            if not build_handler.test_repo():
                 if verbose: print(f"Removing {repo}, failed to run tests")
                 remove_dir(repo_path)
                 return
+            build_handler.clean_repo()
             pbar.update(1)
 
             # If repo was not removed, then it is a good repo
             updates["good_repo_for_crab"] = True
-        finally:
-            container.kill()
-            container.remove()
 
 def save_df_with_updates(df, updates_list, verbose=False):
     # Create columns for the new data
