@@ -136,12 +136,19 @@ def remove_dir(dir: str) -> None:
     if os.listdir(parent) == []:
         shutil.rmtree(parent)
 
-def clean_output(output: bytes) -> str:
-    output_lines = output.decode().split("\n")
-    cleaned_lines = []
+def merge_download_lines(lines: list) -> list:
+    """
+    Merges lines that are part of the same download block in Maven output.
+
+    Args:
+        lines (list): The lines to merge.
+
+    Returns:
+        list: The merged lines.
+    """
     downloading_block = False
-    
-    for line in output_lines:
+    cleaned_lines = []
+    for line in lines:
         if re.match(r"\[INFO\] Download(ing|ed) from", line):
             if not downloading_block:
                 cleaned_lines.append("[CRAB] Downloading stuff")
@@ -149,7 +156,38 @@ def clean_output(output: bytes) -> str:
         else:
             cleaned_lines.append(line)
             downloading_block = False
-    
+    return cleaned_lines
+
+def merge_unapproved_licences(lines: list) -> list:
+    """
+    Merges lines that are part of the same unapproved licences block in Maven output.
+
+    Args:
+        lines (list): The lines to merge.
+
+    Returns:
+        list: The merged lines.
+    """
+    licenses_block = False
+    cleaned_lines = []
+    for line in lines:
+        if re.match(r"\[WARNING\] Files with unapproved licenses:", line):
+            cleaned_lines.append(line)
+            cleaned_lines.append("[CRAB] List of all the unapproved licenses...")
+            licenses_block = True
+        elif licenses_block and not re.match(r"\s+\?\/\.m2\/repository", line):
+            licenses_block = False
+
+        if not licenses_block:
+            cleaned_lines.append(line)
+    return cleaned_lines
+
+def clean_output(output: bytes) -> str:
+    output_lines = output.decode().split("\n")
+
+    cleaned_lines = merge_download_lines(output_lines)
+    cleaned_lines = merge_unapproved_licences(cleaned_lines)
+
     return "\n".join(cleaned_lines)
 
 def compile_repo(build_file: str, container, updates: dict) -> bool:
