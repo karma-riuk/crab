@@ -6,7 +6,8 @@ import shutil
 tqdm.pandas()
 
 EXCLUSION_LIST = [
-    "edmcouncil/idmp",
+    "edmcouncil/idmp", # requires authentication
+    "aosp-mirror/platform_frameworks_base", # takes ages to clone
 ]
 
 def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
