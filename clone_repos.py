@@ -215,9 +215,8 @@ def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False)
                     last_i_saved = i
                 pbar.set_postfix({
                     "repo": row["name"],
-                    "# good repos": f"{good_repos} ({good_repos/len(updates_list) if len(updates_list) > 0 else 0:.2%})", 
                     "last index saved": last_i_saved,
-                    "# gradle": sum(updates["build_system"] == "gradle" for _, updates in updates_list if "build_system" in updates)
+                    "# good repos": f"{good_repos} ({good_repos/len(updates_list) if len(updates_list) > 0 else 0:.2%})", 
                 })
                 updates = {}
                 updates_list.append((i, updates))  # Collect updates
