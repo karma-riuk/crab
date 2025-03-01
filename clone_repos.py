@@ -122,11 +122,6 @@ def remove_dir(dir: str) -> None:
     if os.listdir(parent) == []:
         shutil.rmtree(parent)
 
-def execute_in_container(container, command):
-    exec_result = container.exec_run(command, stream=True)
-    output = "".join([line.decode() for line in exec_result.output])
-    return exec_result.exit_code, output
-
 def compile_repo(build_file: str, container, updates: dict) -> bool:
     """
     Attempts to compile a repository inside a running Docker container.
@@ -139,8 +134,9 @@ def compile_repo(build_file: str, container, updates: dict) -> bool:
         updates["error_msg"] = "Unsupported build system for compiling: " + build_file
         return False
     
-    exit_code, output = execute_in_container(container, build_cmd)
-    if exit_code != 0:
+    exec_result = container.exec_run(build_cmd)
+    output = [line for line in exec_result.output.decode().split("\n") if not (line.startswith("Down") or line.startswith("Progress"))]
+    if exec_result.exit_code != 0:
         updates["compiled_successfully"] = False
         updates["error_msg"] = output
         return False
@@ -157,8 +153,9 @@ def test_repo(build_file: str, container, updates: dict) -> bool:
         updates["error_msg"] = "Unsupported build system for testing: " + build_file
         return False
     
-    exit_code, output = execute_in_container(container, test_cmd)
-    if exit_code != 0:
+    exec_result = container.exec_run(test_cmd)
+    output = exec_result.output.decode()
+    if exec_result.exit_code != 0:
         updates["tested_successfully"] = False
         updates["error_msg"] = output
         return False
