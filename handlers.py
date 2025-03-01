@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import os, re, docker, subprocess
+from bs4 import BeautifulSoup
 
 USER_ID = os.getuid() # for container user
 GROUP_ID = os.getgid() 
@@ -182,6 +183,19 @@ class GradleHandler(BuildHandler):
         self.updates["n_tests_failed"] = -1
         self.updates["n_tests_errors"] = -1
         self.updates["n_tests_skipped"] = -1
+
+        # Load the HTML file
+        with open(os.path.join(self.path, "build/reports/tests/test/index.html"), "r", encoding="utf-8") as file:
+            soup = BeautifulSoup(file, "html.parser")
+        
+            # Extract total tests
+            self.updates["n_tests"] = int(soup.find("div", class_="infoBox", id="tests").find("div", class_="counter").text.strip())
+            
+            # Extract failed tests
+            self.updates["n_tests_failed"] = int(soup.find("div", class_="infoBox", id="failures").find("div", class_="counter").text.strip())
+            
+            # Calculate passed tests
+            self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
 
 def merge_download_lines(lines: list) -> list:
     """
