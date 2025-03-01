@@ -146,9 +146,9 @@ def compile_repo(build_file: str, container, updates: dict) -> bool:
 
 def test_repo(build_file: str, container, updates: dict) -> bool:
     if build_file.endswith("pom.xml") or build_file.endswith("build.xml"):
-        test_cmd = "mvn clean compile"
+        test_cmd = "mvn test"
     elif build_file.endswith("build.gradle"):
-        test_cmd = "gradle compileJava"
+        test_cmd = "gradle test"
     else:
         updates["error_msg"] = "Unsupported build system for testing: " + build_file
         return False
