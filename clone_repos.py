@@ -5,6 +5,9 @@ import shutil
 
 tqdm.pandas()
 
+USER_ID = os.getuid() # for container user
+GROUP_ID = os.getgid() 
+
 EXCLUSION_LIST = [
     "edmcouncil/idmp", # requires authentication
     "aosp-mirror/platform_frameworks_base", # takes ages to clone
@@ -212,6 +215,7 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
             image="crab-java-env",
             command="tail -f /dev/null",
             volumes={os.path.abspath(repo_path): {"bind": "/repo", "mode": "rw"}},
+            user=f"{USER_ID}:{GROUP_ID}",
             detach=True,
             tty=True
         )
