@@ -185,7 +185,7 @@ def save_df_with_updates(df, updates_list, verbose=False):
     if verbose: print("Writing results...")
     df.to_csv("results.csv", index=False)
 
-def clone_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
+def process_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
     """
     Download the repos listed in the file passed as argument. The downloaded repos will be placed in the folder that is named as the dest argument.
 
@@ -245,5 +245,5 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action="store_true", help="Make the program verbose")
     args = parser.parse_args()
 
-    clone_repos(args.file, args.dest, force=args.force, verbose=args.verbose)
+    process_repos(args.file, args.dest, force=args.force, verbose=args.verbose)
 
