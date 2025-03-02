@@ -230,7 +230,7 @@ def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False
                         good_repos += 1 if already_good_for_crab else 0
                         continue
                 updates = {}
-                updates_list.append((i, updates))  # Collect updates
+                updates_list.append((i, updates))
                 process_row(row["name"], client, dest, updates, force=force, verbose=verbose)
                 if "good_repo_for_crab" in updates and updates["good_repo_for_crab"]:
                     good_repos += 1
