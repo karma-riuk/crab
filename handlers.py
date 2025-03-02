@@ -138,8 +138,7 @@ class MavenHandler(BuildHandler):
     def container_name(self) -> str:
         return "crab-maven"
 
-    def extract_test_numbers(self, output: str) -> None:
-        # NOTE: I'ma afraid this might be specific for junit and wouldn't work for other testing frameworks
+    def extract_test_numbers(self, output: str) -> bool:
         pattern = r"\[INFO\] Results:\n\[INFO\]\s*\n\[INFO\] Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)"
 
         matches = re.findall(pattern, output)
@@ -150,6 +149,10 @@ class MavenHandler(BuildHandler):
         self.updates["n_tests_errors"] = 0
         self.updates["n_tests_skipped"] = 0
 
+        if len(matches) == 0:
+            self.updates["error_msg"] = "No test results found in Maven output:\n" + output
+            return False
+
         for match in matches:
             tests_run, failures, errors, skipped = map(int, match)
             self.updates["n_tests"] += tests_run
@@ -157,6 +160,8 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_errors"] += errors
             self.updates["n_tests_skipped"] += skipped
             self.updates["n_tests_passed"] += (tests_run - (failures + errors))  # Calculate passed tests
+
+        return True
 
         
 
