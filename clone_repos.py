@@ -3,6 +3,7 @@ import argparse, os, sys, subprocess, docker
 from tqdm import tqdm
 import shutil
 from typing import Optional
+import numpy as np
 
 from handlers import GradleHandler, MavenHandler, BuildHandler
 
@@ -159,7 +160,7 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
             # If repo was not removed, then it is a good repo
             updates["good_repo_for_crab"] = True
 
-def save_df_with_updates(df, updates_list, verbose=False):
+def save_df_with_updates(df, updates_list, results_file: str, verbose=False):
     # Create columns for the new data
     df = df.assign(
         cloned_successfully=None,
@@ -184,9 +185,9 @@ def save_df_with_updates(df, updates_list, verbose=False):
             df.at[index, col] = value  # Batch updates to avoid fragmentation
 
     if verbose: print("Writing results...")
-    df.to_csv("results.csv", index=False)
+    df.to_csv(results_file, index=False)
 
-def process_repos(file: str, dest: str, force: bool =False, verbose: bool = False) -> None:
+def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False, force: bool =False, verbose: bool = False) -> None:
     """
     Download the repos listed in the file passed as argument. The downloaded repos will be placed in the folder that is named as the dest argument.
 
@@ -198,6 +199,7 @@ def process_repos(file: str, dest: str, force: bool =False, verbose: bool = Fals
     """
     if verbose: print(f"Reading CSV file {file}")
     df = pd.read_csv(file)
+    results_df = pd.read_csv(results_file) if lazy else None
 
     # drop all columns besides the name
     df = df[["name"]]
@@ -206,45 +208,56 @@ def process_repos(file: str, dest: str, force: bool =False, verbose: bool = Fals
     client = docker.from_env()
 
     good_repos = 0
+    n_processed = 0
     last_i_saved = -1
     try:
         if verbose: print("Processing repositories")
         with tqdm(total=len(df)) as pbar:
             for i, row in df.iterrows():
                 if i % 10 == 0:
-                    save_df_with_updates(df, updates_list, verbose=verbose)
+                    save_df_with_updates(df, updates_list, results_file, verbose=verbose)
                     last_i_saved = i
                 pbar.set_postfix({
                     "repo": row["name"],
                     "last index saved": last_i_saved,
-                    "# good repos": f"{good_repos} ({good_repos/len(updates_list) if len(updates_list) > 0 else 0:.2%})", 
+                    "# good repos": f"{good_repos} ({good_repos/n_processed if n_processed > 0 else 0:.2%})", 
                 })
+                if lazy:
+                    already_good_for_crab = results_df[results_df["name"] == row["name"]].iloc[0]["good_repo_for_crab"]
+                    if not np.isnan(already_good_for_crab):
+                        pbar.update(1)
+                        n_processed += 1
+                        good_repos += 1 if already_good_for_crab else 0
+                        continue
                 updates = {}
                 updates_list.append((i, updates))  # Collect updates
                 process_row(row["name"], client, dest, updates, force=force, verbose=verbose)
                 if "good_repo_for_crab" in updates and updates["good_repo_for_crab"]:
                     good_repos += 1
                 pbar.update(1)
+                n_processed += 1
     except KeyboardInterrupt as e:
         print("Interrupted by user, saving progress...")
-        save_df_with_updates(df, updates_list, verbose=verbose)
+        save_df_with_updates(df, updates_list, results_file, verbose=verbose)
         raise e
     except Exception as e:
         print("An error occured, saving progress and then raising the error...")
-        save_df_with_updates(df, updates_list, verbose=verbose)
+        save_df_with_updates(df, updates_list, results_file, verbose=verbose)
         raise e
 
     if verbose: print("Saving results...")
-    save_df_with_updates(df, updates_list, verbose=verbose)
+    save_df_with_updates(df, updates_list, results_file, verbose=verbose)
 
 if __name__ == "__main__":
     # whtie the code to parse the arguments here
     parser = argparse.ArgumentParser(description="Clone repos from a given file")
     parser.add_argument("file", default="results.csv.gz", help="The file to download the repos from. Default is 'results.csv.gz'")
     parser.add_argument("-d", "--dest", default="./results/", help="The root directory in which to download the repos. Default is './results/'")
+    parser.add_argument("-r", "--results", default="results.csv", help="The name of file in which to save the results. Also used with --continue. Default is 'results.csv'")
+    parser.add_argument("-l", "--lazy", action="store_true", help="If given, the program will continue from where it left off, by not touch the already processed repos. Will look at the file pointed by the --results argument")
     parser.add_argument("-f", "--force", action="store_true", help="Force the download of the repos")
     parser.add_argument("-v", "--verbose", action="store_true", help="Make the program verbose")
     args = parser.parse_args()
 
-    process_repos(args.file, args.dest, force=args.force, verbose=args.verbose)
+    process_repos(args.file, args.dest, args.results, lazy=args.lazy, force=args.force, verbose=args.verbose)
 
