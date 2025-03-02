@@ -108,6 +108,7 @@ def remove_dir(dir: str) -> None:
 
 def process_row(repo, client, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
     updates["good_repo_for_crab"] = False
+    updates["processed"] = True
     with tqdm(total=5, leave=False) as pbar:
         if repo in EXCLUSION_LIST:
             updates["error_msg"] = "Repo in exclusion list"
@@ -163,6 +164,7 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
 def save_df_with_updates(df, updates_list, results_file: str, verbose=False):
     # Create columns for the new data
     df = df.assign(
+        processed=False,
         cloned_successfully=None,
         build_system=None,
         depth_of_build_file=None,
@@ -223,11 +225,13 @@ def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False
                     "# good repos": f"{good_repos} ({good_repos/n_processed if n_processed > 0 else 0:.2%})", 
                 })
                 if lazy:
-                    already_good_for_crab = results_df[results_df["name"] == row["name"]].iloc[0]["good_repo_for_crab"]
-                    if not np.isnan(already_good_for_crab):
+                    already_processed_row = results_df[results_df["name"] == row["name"]].iloc[0]
+                    already_processed = already_processed_row["processed"]
+                    if already_processed: # row was already processed
                         pbar.update(1)
                         n_processed += 1
-                        good_repos += 1 if already_good_for_crab else 0
+                        updates_list.append((i, dict(already_processed_row))) 
+                        good_repos += 1 if already_processed_row["good_repo_for_crab"] else 0
                         continue
                 updates = {}
                 updates_list.append((i, updates))
