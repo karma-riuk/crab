@@ -81,7 +81,7 @@ class BuildHandler(ABC):
         self.updates["tested_successfully"] = True
         self.updates["error_msg"] = output
 
-        self.extract_test_numbers(output)
+        extracted_successfully = self.extract_test_numbers(output)
 
         grep_cmd = f"grep -r --include='*.java' -E '@Test|@ParameterizedTest' {self.path} | wc -l" # NOTE: After inspection, this is an upper bound, since comments get matched, but also, non c'entra nulla, not a good idea to keep it
         try:
@@ -92,7 +92,7 @@ class BuildHandler(ABC):
 
         self.updates["n_tests_with_grep"] = test_count
 
-        return True
+        return extracted_successfully
 
     def clean_repo(self) -> None:
         self.container.exec_run(self.clean_cmd())
@@ -107,7 +107,7 @@ class BuildHandler(ABC):
         pass
 
     @abstractmethod
-    def extract_test_numbers(self, output: str) -> None:
+    def extract_test_numbers(self, output: str) -> bool:
         pass
 
     @abstractmethod
@@ -177,25 +177,49 @@ class GradleHandler(BuildHandler):
     def container_name(self) -> str:
         return "crab-gradle"
 
-    def extract_test_numbers(self, output: str) -> None:
+    def extract_test_numbers(self, output: str) -> bool:
         self.updates["n_tests"] = -1
         self.updates["n_tests_passed"] = -1
         self.updates["n_tests_failed"] = -1
         self.updates["n_tests_errors"] = -1
         self.updates["n_tests_skipped"] = -1
 
+        test_results_path = os.path.join(self.path, "build/reports/tests/test/index.html")
+        if not os.path.exists(test_results_path):
+            self.updates["error_msg"] = "No test results found (prolly a repo with sub-projects)"
+            return False
+
         # Load the HTML file
-        with open(os.path.join(self.path, "build/reports/tests/test/index.html"), "r", encoding="utf-8") as file:
+        with open(test_results_path, "r") as file:
             soup = BeautifulSoup(file, "html.parser")
         
-            # Extract total tests
-            self.updates["n_tests"] = int(soup.find("div", class_="infoBox", id="tests").find("div", class_="counter").text.strip())
+            test_div = soup.find("div", class_="infoBox", id="tests")
+            if test_div is None:
+                self.updates["error_msg"] = "No test results found (no div.infoBox#tests)"
+                return False
+
+            counter_div = test_div.find("div", class_="counter")
+            if counter_div is None:
+                self.updates["error_msg"] = "No test results found (not div.counter for tests)"
+                return False
+
+            self.updates["n_tests"] = int(counter_div.text.strip())
             
-            # Extract failed tests
-            self.updates["n_tests_failed"] = int(soup.find("div", class_="infoBox", id="failures").find("div", class_="counter").text.strip())
+            failures_div = soup.find("div", class_="infoBox", id="failures")
+            if failures_div is None:
+                self.updates["error_msg"] = "No test results found (no div.infoBox#failures)"
+                return False
+
+            counter_div = failures_div.find("div", class_="counter")
+            if counter_div is None:
+                self.updates["error_msg"] = "No test results found (not div.counter for failures)"
+                return False
+
+            self.updates["n_tests_failed"] = int(counter_div.text.strip())
             
             # Calculate passed tests
             self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
+        return True
 
 def merge_download_lines(lines: list) -> list:
     """
