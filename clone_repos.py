@@ -3,7 +3,6 @@ import argparse, os, sys, subprocess, docker
 from tqdm import tqdm
 import shutil
 from typing import Optional
-import numpy as np
 
 from handlers import GradleHandler, MavenHandler, BuildHandler
 
