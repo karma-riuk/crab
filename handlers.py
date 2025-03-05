@@ -83,14 +83,6 @@ class BuildHandler(ABC):
 
         extracted_successfully = self.extract_test_numbers(output)
 
-        grep_cmd = f"grep -r --include='*.java' -E '@Test|@ParameterizedTest' {self.path} | wc -l" # NOTE: After inspection, this is an upper bound, since comments get matched, but also, non c'entra nulla, not a good idea to keep it
-        try:
-            result = subprocess.run(grep_cmd, shell=True, capture_output=True, text=True, check=True)
-            test_count = result.stdout.strip()
-        except subprocess.CalledProcessError as e:
-            test_count = "-1"  # Default to 0 if grep command fails
-
-        self.updates["n_tests_with_grep"] = test_count
 
         return extracted_successfully
 
