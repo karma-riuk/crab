@@ -18,11 +18,11 @@ def get_commits(repo_url: str, pr_number: str) -> list[dict]:
     response = github_call(f'{repo_url}/pulls/{pr_number}/commits')
     return response.json()
 
-def extract_date(date: str) -> datetime:
+def parse_date(date: str) -> datetime:
     return datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
 
 def get_first_comment_date(comments: list[dict]) -> datetime:
-    return min([extract_date(comment['created_at']) for comment in comments])
+    return min([parse_date(comment['created_at']) for comment in comments])
 
 def get_useful_commits(commits: list[dict], first_comment_date: datetime) -> list[dict]:
     ret = []
@@ -31,7 +31,7 @@ def get_useful_commits(commits: list[dict], first_comment_date: datetime) -> lis
                 and "author" not in commit["author"] 
                 and "date" not in commit['commit']['author']):
             continue
-        commit_date = extract_date(commit['commit']['author']['date'])
+        commit_date = parse_date(commit['commit']['author']['date'])
         if commit_date > first_comment_date:
             ret.append(commit)
     return ret
