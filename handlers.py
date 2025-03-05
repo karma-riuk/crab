@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-import os, re, docker, subprocess
+import os, re, docker, signal
 from bs4 import BeautifulSoup
 
 USER_ID = os.getuid() # for container user
@@ -71,20 +71,32 @@ class BuildHandler(ABC):
         return True
 
     def test_repo(self) -> bool:
-        exec_result = self.container.exec_run(self.test_cmd())
-        output = clean_output(exec_result.output)
-        if exec_result.exit_code != 0:
-            self.updates["tested_successfully"] = False
+        def timeout_handler(signum, frame):
+           raise TimeoutError("Tests exceeded time limit")
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3600)  # Set timeout to 1 hour (3600 seconds)
+
+        try:
+            exec_result = self.container.exec_run(self.test_cmd())
+            output = clean_output(exec_result.output)
+            if exec_result.exit_code != 0:
+                self.updates["tested_successfully"] = False
+                self.updates["error_msg"] = output
+                return False
+            
+            self.updates["tested_successfully"] = True
             self.updates["error_msg"] = output
+
+            return self.extract_test_numbers(output)
+
+        except TimeoutError:
+            self.updates["tested_successfully"] = False
+            self.updates["error_msg"] = "Test process killed due to exceeding the 1-hour time limit"
             return False
-        
-        self.updates["tested_successfully"] = True
-        self.updates["error_msg"] = output
 
-        extracted_successfully = self.extract_test_numbers(output)
-
-
-        return extracted_successfully
+        finally:
+            signal.alarm(0)  # Cancel the alarm
 
     def clean_repo(self) -> None:
         self.container.exec_run(self.clean_cmd())
