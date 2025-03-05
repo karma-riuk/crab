@@ -1,5 +1,6 @@
-import os, requests, json
+import os, requests, re
 from datetime import datetime
+from typing import Optional
 
 COMMON_HEADERS = {
     'Accept': 'application/vnd.github+json',
@@ -36,9 +37,39 @@ def get_useful_commits(commits: list[dict], first_comment_date: datetime) -> lis
             ret.append(commit)
     return ret
 
+def parse_hunk_header(hunk_header) -> Optional[dict]:
+    """Extracts line ranges from a diff hunk header."""
+    match = re.match(r'@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@', hunk_header)
+    if match:
+        old_start = int(match.group(1))
+        old_count = int(match.group(2)) if match.group(2) else 1
+        new_start = int(match.group(3))
+        new_count = int(match.group(4)) if match.group(4) else 1
+        return {
+            "old_range": {
+                "start" : old_start,
+                "end" : old_start + old_count - 1
+            },
+            "new_range": {
+                "start" : new_start,
+                "end" : new_start + new_count - 1
+            },
+        }
+    return None
+
+def augment_comments(comments: list[dict]) -> list[dict]:
+    ret = []
+    for comment in comments:
+        new_comment = comment.copy()
+        if "diff_hunk" not in comment:
+            continue
+        new_comment["hunk_range"] = parse_hunk_header(comment["diff_hunk"])
+        ret.append(new_comment)
+    return ret
+
 
 def process_pull_request(repo_url: str, pr_number: str) -> bool:
-    comments = get_comments(repo_url, pr_number)
+    comments = augment_comments(get_comments(repo_url, pr_number))
 
     if len(comments) == 0:
         # No comments, can't extract triplet
