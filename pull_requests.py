@@ -69,7 +69,8 @@ def augment_comments(comments: list[dict]) -> list[dict]:
 
 
 def process_pull_request(repo_url: str, pr_number: str) -> bool:
-    comments = augment_comments(get_comments(repo_url, pr_number))
+    tmp_comments = get_comments(repo_url, pr_number)
+    comments = augment_comments(tmp_comments)
 
     if len(comments) == 0:
         # No comments, can't extract triplet
@@ -80,7 +81,8 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
 
     # get commits and filter out the ones that are older than the first
     # comment, since they are the commits relevant for the PR
-    commits = get_useful_commits(get_commits(repo_url, pr_number), first_comment_date)
+    tmp_commits = get_commits(repo_url, pr_number)
+    commits = get_useful_commits(tmp_commits, first_comment_date)
 
     if len(commits) == 0:
         # No commits after the first comment, there were no revision from the contributor, so no triplet
