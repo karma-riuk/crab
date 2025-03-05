@@ -3,6 +3,7 @@ import argparse, os, sys, subprocess, docker
 from tqdm import tqdm
 import shutil
 from typing import Optional
+from datetime import datetime
 
 from handlers import GradleHandler, MavenHandler, BuildHandler
 
@@ -222,6 +223,7 @@ def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False
                     "repo": row["name"],
                     "last index saved": last_i_saved,
                     "# good repos": f"{good_repos} ({good_repos/n_processed if n_processed > 0 else 0:.2%})", 
+                    "time": datetime.now().strftime("%H:%M:%S")
                 })
                 if lazy:
                     already_processed_row = results_df[results_df["name"] == row["name"]].iloc[0]
