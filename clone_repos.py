@@ -212,9 +212,17 @@ def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False
     good_repos = 0
     n_processed = 0
     last_i_saved = -1
+    if lazy and results_df is not None:
+        only_processed = results_df[results_df["processed"]]
+        good_repos = only_processed[only_processed["good_repo_for_crab"] == True]["good_repo_for_crab"].sum()
+        n_processed = len(only_processed)
+        last_i_saved = n_processed
+        df = df[~df["name"].isin(only_processed["name"])]
+
     try:
         if verbose: print("Processing repositories")
         with tqdm(total=len(df)) as pbar:
+            pbar.update(n_processed)
             for i, row in df.iterrows():
                 if i % 10 == 0:
                     save_df_with_updates(df, updates_list, results_file, verbose=verbose)
