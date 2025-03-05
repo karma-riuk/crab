@@ -80,14 +80,14 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
 
     # get commits and filter out the ones that are older than the first
     # comment, since they are the commits relevant for the PR
-    actual_commits = get_useful_commits(get_commits(repo_url, pr_number), first_comment_date)
+    commits = get_useful_commits(get_commits(repo_url, pr_number), first_comment_date)
 
-    if len(actual_commits) == 0:
+    if len(commits) == 0:
         # No commits after the first comment, there were no revision from the contributor, so no triplet
         return False
 
 
-    for commit in actual_commits:
+    for commit in commits:
         print(f"Commit: {commit['sha']}")
         print(f"Author: {commit['author']['login']}")
         print(f"Date: {commit['commit']['author']['date']}")
