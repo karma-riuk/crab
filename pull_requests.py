@@ -1,6 +1,7 @@
 import os, requests, re
 from datetime import datetime
 from typing import Optional
+import itertools
 
 COMMON_HEADERS = {
     'Accept': 'application/vnd.github+json',
@@ -15,9 +16,22 @@ def get_comments(repo_url: str, pr_number: str) -> list[dict]:
     response = github_call(f'{repo_url}/pulls/{pr_number}/comments')
     return response.json()
 
+def get_commit(repo_url: str, commit_sha: str) -> dict:
+    response = github_call(f'{repo_url}/commits/{commit_sha}')
+    return response.json()
+
 def get_commits(repo_url: str, pr_number: str) -> list[dict]:
     response = github_call(f'{repo_url}/pulls/{pr_number}/commits')
-    return response.json()
+    commits = response.json()
+    for commit in commits:
+        detailed_commit = get_commit(repo_url, commit['sha'])
+        if "files" not in detailed_commit:
+            continue
+
+        for file in detailed_commit['files']:
+            file["patch_range"] = parse_hunk_header(file['patch'])
+        commit["files"] = detailed_commit["files"]
+    return commits
 
 def parse_date(date: str) -> datetime:
     return datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
@@ -67,6 +81,26 @@ def augment_comments(comments: list[dict]) -> list[dict]:
         ret.append(new_comment)
     return ret
 
+def is_range_overlapping(range1: dict, range2: dict) -> bool:
+    return range1["start"] <= range2["start"] <= range1["end"] or range2["start"] <= range1["start"] <= range2["end"]
+
+def get_overlapping_commits_and_comments(commits: list[dict], comments: list[dict]) -> list[tuple[dict, dict]]:
+    ret = []
+    for commit, comment in itertools.product(commits, comments):
+        if "hunk_range" not in comment:
+            continue
+        if "files" not in commit:
+            continue
+        if parse_date(commit['commit']['author']['date']) < parse_date(comment['created_at']):
+            # we can't address a comment if that comment was made after the commit
+            continue
+        for file in commit["files"]:
+            if "patch_range" not in file:
+                continue
+            if file["filename"] == comment["path"]:
+                if is_range_overlapping(file["patch_range"]["old_range"], comment["hunk_range"]["new_range"]):
+                    ret.append((commit, comment))
+    return ret
 
 def process_pull_request(repo_url: str, pr_number: str) -> bool:
     tmp_comments = get_comments(repo_url, pr_number)
@@ -89,17 +123,14 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
         return False
 
 
-    for commit in commits:
-        print(f"Commit: {commit['sha']}")
-        print(f"Author: {commit['author']['login']}")
-        print(f"Date: {commit['commit']['author']['date']}")
-        print(f"Message: {commit['commit']['message']}")
-        print("")
+    overlapping_commits_and_comments = get_overlapping_commits_and_comments(commits, comments)
+    for commit, comment in overlapping_commits_and_comments:
+        print(f"Commit: {commit['sha']} address comment {comment['id']}")
+        print(f"Commit message: {commit['commit']['message']}")
+        print(f"Comment: {comment['body']}")
+        print()
 
     return True
-
-
-
 
 if __name__ == "__main__":
     response  = github_call('https://api.github.com/repos/cdk/cdk/pulls/1140/commits')
