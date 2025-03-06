@@ -185,5 +185,19 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
 
     return True
 
+def is_pr_eligible(pr: dict) -> bool:
+    return pr['state'] == 'closed' and pr['merged_at'] is not None
+
+def process_repo(repo_name: str) -> None:
+    all_triplets = pd.DataFrame()
+    prs = github_call(f'https://api.github.com/repos/{repo_name}/pulls?state=closed').json()
+    for pr in prs:
+        if not is_pr_eligible(pr):
+            continue
+        triplets = process_pull_request(f'https://api.github.com/repos/{repo_name}', str(pr['number']))
+        all_triplets = all_triplets.append(triplets, ignore_index=True)
+
+    all_triplets.to_csv("triplets.csv", index=False)
+
 if __name__ == "__main__":
     process_pull_request('https://api.github.com/repos/cdk/cdk', '1140')
