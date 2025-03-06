@@ -3,3 +3,4 @@ tqdm
 docker
 beautifulsoup4
 unidiff
+PyGithub
