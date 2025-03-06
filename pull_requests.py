@@ -164,7 +164,6 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
         # No comments, can't extract triplet
         return False
 
-
     first_comment_date = get_first_comment_date(comments)
 
     # get commits and filter out the ones that are older than the first
@@ -176,15 +175,7 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
         # No commits after the first comment, there were no revision from the contributor, so no triplet
         return False
 
-
     overlapping_commits_and_comments = get_overlapping_commits_and_comments(commits, comments)
-
-    for commit, comment in overlapping_commits_and_comments:
-        print(f"Commit: {commit['sha']} address comment {comment['id']}")
-        print(f"Commit message: {commit['commit']['message']}")
-        print(f"Comment: {comment['body']}")
-        print(commit["relevant_file"]['patch'])
-        print()
 
     triplets_df = pd.DataFrame(extract_triplet(overlapping_commits_and_comments))
     repo_name = "/".join(repo_url.split("/")[-2:])
@@ -195,6 +186,4 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
     return True
 
 if __name__ == "__main__":
-    response  = github_call('https://api.github.com/repos/cdk/cdk/pulls/1140/commits')
-    response  = github_call('https://api.github.com/repos/cdk/cdk/pulls/1140/commits')
     process_pull_request('https://api.github.com/repos/cdk/cdk', '1140')
