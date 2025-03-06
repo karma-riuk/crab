@@ -2,6 +2,10 @@ import os, requests, re
 from datetime import datetime
 from typing import Optional
 import itertools
+import pandas as pd
+
+from unidiff import PatchSet
+from io import StringIO
 
 COMMON_HEADERS = {
     'Accept': 'application/vnd.github+json',
@@ -10,7 +14,10 @@ COMMON_HEADERS = {
 }
 
 def github_call(url):
-    return requests.get(url, headers=COMMON_HEADERS)
+    result = requests.get(url, headers=COMMON_HEADERS)
+    if result.status_code != 200:
+        raise Exception(f"Failed to fetch {url}: {result.status_code}")
+    return result
 
 def get_comments(repo_url: str, pr_number: str) -> list[dict]:
     response = github_call(f'{repo_url}/pulls/{pr_number}/comments')
@@ -99,7 +106,54 @@ def get_overlapping_commits_and_comments(commits: list[dict], comments: list[dic
                 continue
             if file["filename"] == comment["path"]:
                 if is_range_overlapping(file["patch_range"]["old_range"], comment["hunk_range"]["new_range"]):
-                    ret.append((commit, comment))
+                    commit_copy = commit.copy()
+                    commit_copy["relevant_file"] = file
+                    ret.append((commit_copy, comment))
+    return ret
+
+def reverse_patch(file_after: str, patch_content: str) -> str:
+    """
+    Reverses a patch and applies it to a file to get the version of the file before the patch.
+    """
+    # Parse the patch
+    patch = PatchSet(StringIO(patch_content))
+    
+    # Extract the file to be patched
+    after_lines = file_after.splitlines(keepends=True)
+
+    for patched_file in patch:
+        if patched_file.is_modified_file:
+            original_lines = after_lines[:]
+            modified_lines = []
+
+            # Apply the patch in reverse
+            for hunk in patched_file:
+                hunk_lines = [str(line.value) for line in hunk.source_lines()]
+                new_start = hunk.target_start - 1
+                new_end = new_start + hunk.target_length
+
+                # Replace modified section with original content from patch
+                modified_lines.extend(original_lines[:new_start])
+                modified_lines.extend(hunk_lines)
+                original_lines = original_lines[new_end:]
+
+            modified_lines.extend(original_lines)
+            return "".join(modified_lines)
+
+    return file_after  # Return unmodified if no patch applies
+
+def extract_triplet(commit_comments: list[tuple[dict, dict]])-> list[dict]:
+    ret = []
+    for commit, comment in commit_comments:
+        file_after = github_call(commit["relevant_file"]["raw_url"]).text
+        filename = comment["path"]
+        patch_content = f"--- a/{filename}\n+++ b/{filename}\n" + commit["relevant_file"]["patch"] + "\n"
+        file_before = reverse_patch(file_after, patch_content)
+        ret.append({
+            "file_before": file_before, 
+            "comment": comment["body"], 
+            "file_after": file_after
+        })
     return ret
 
 def process_pull_request(repo_url: str, pr_number: str) -> bool:
@@ -124,11 +178,19 @@ def process_pull_request(repo_url: str, pr_number: str) -> bool:
 
 
     overlapping_commits_and_comments = get_overlapping_commits_and_comments(commits, comments)
+
     for commit, comment in overlapping_commits_and_comments:
         print(f"Commit: {commit['sha']} address comment {comment['id']}")
         print(f"Commit message: {commit['commit']['message']}")
         print(f"Comment: {comment['body']}")
+        print(commit["relevant_file"]['patch'])
         print()
+
+    triplets_df = pd.DataFrame(extract_triplet(overlapping_commits_and_comments))
+    repo_name = "/".join(repo_url.split("/")[-2:])
+    triplets_df["repo"] = repo_name
+    triplets_df["pr_number"] = pr_number
+    triplets_df.to_csv("triplets.csv", index=False)
 
     return True
 
