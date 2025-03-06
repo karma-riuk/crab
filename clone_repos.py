@@ -162,25 +162,6 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
             updates["good_repo_for_crab"] = True
 
 def save_df_with_updates(df, updates_list, results_file: str, verbose=False):
-    # Create columns for the new data
-    df = df.assign(
-        processed=False,
-        cloned_successfully=None,
-        build_system=None,
-        depth_of_build_file=None,
-        detected_source_of_tests=None,
-        compiled_successfully=None,
-        tested_successfully=None,
-        n_tests=None,
-        n_tests_with_grep=None,
-        n_tests_passed=None,
-        n_tests_failed=None,
-        n_tests_errors=None,
-        n_tests_skipped=None,
-        good_repo_for_crab=None,
-        error_msg=None,
-    )
-
    # Set the new data
     for index, updates in updates_list:
         for col, value in updates.items():
@@ -205,6 +186,23 @@ def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False
 
     # drop all columns besides the name
     df = df[["name"]]
+    df = df.assign(
+        processed=False,
+        cloned_successfully=None,
+        build_system=None,
+        depth_of_build_file=None,
+        detected_source_of_tests=None,
+        compiled_successfully=None,
+        tested_successfully=None,
+        n_tests=None,
+        n_tests_with_grep=None,
+        n_tests_passed=None,
+        n_tests_failed=None,
+        n_tests_errors=None,
+        n_tests_skipped=None,
+        good_repo_for_crab=None,
+        error_msg=None,
+    )
 
     updates_list = []  # Collect updates in a list
     client = docker.from_env()
@@ -212,18 +210,19 @@ def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False
     good_repos = 0
     n_processed = 0
     last_i_saved = -1
+    to_be_processed = df
     if lazy and results_df is not None:
+        df = results_df.copy()
         only_processed = results_df[results_df["processed"]]
         good_repos = only_processed[only_processed["good_repo_for_crab"] == True]["good_repo_for_crab"].sum()
         n_processed = len(only_processed)
         last_i_saved = n_processed
-        df = df[~df["name"].isin(only_processed["name"])]
-
+        to_be_processed = df.loc[~df["name"].isin(only_processed["name"])] # the .loc is to have a view of df and not to make a copy (a copy resets the index and we don't want that)
     try:
         if verbose: print("Processing repositories")
         with tqdm(total=len(df)) as pbar:
             pbar.update(n_processed)
-            for i, row in df.iterrows():
+            for i, row in to_be_processed.iterrows():
                 if i % 10 == 0:
                     save_df_with_updates(df, updates_list, results_file, verbose=verbose)
                     last_i_saved = i
@@ -233,15 +232,6 @@ def process_repos(file: str, dest: str, results_file: str, /, lazy: bool = False
                     "# good repos": f"{good_repos} ({good_repos/n_processed if n_processed > 0 else 0:.2%})", 
                     "time": datetime.now().strftime("%H:%M:%S")
                 })
-                if lazy:
-                    already_processed_row = results_df[results_df["name"] == row["name"]].iloc[0]
-                    already_processed = already_processed_row["processed"]
-                    if already_processed: # row was already processed
-                        pbar.update(1)
-                        n_processed += 1
-                        updates_list.append((i, dict(already_processed_row))) 
-                        good_repos += 1 if already_processed_row["good_repo_for_crab"] else 0
-                        continue
                 updates = {}
                 updates_list.append((i, updates))
                 process_row(row["name"], client, dest, updates, force=force, verbose=verbose)
