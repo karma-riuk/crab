@@ -60,15 +60,29 @@ class BuildHandler(ABC):
         return False
 
     def compile_repo(self) -> bool:
-        exec_result = self.container.exec_run(self.compile_cmd())
-        output = clean_output(exec_result.output)
-        if exec_result.exit_code != 0:
+        def timeout_handler(signum, frame):
+           raise TimeoutError("Tests exceeded time limit")
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3600)  # Set timeout to 1 hour (3600 seconds)
+
+        try:
+            exec_result = self.container.exec_run(self.compile_cmd())
+            output = clean_output(exec_result.output)
+            if exec_result.exit_code != 0:
+                self.updates["compiled_successfully"] = False
+                self.updates["error_msg"] = output
+                return False
+            
+            self.updates["compiled_successfully"] = True 
+            return True
+        except TimeoutError:
             self.updates["compiled_successfully"] = False
-            self.updates["error_msg"] = output
+            self.updates["error_msg"] = "Compile process killed due to exceeding the 1-hour time limit"
             return False
-        
-        self.updates["compiled_successfully"] = True 
-        return True
+
+        finally:
+            signal.alarm(0)  # Cancel the alarm
 
     def test_repo(self) -> bool:
         def timeout_handler(signum, frame):
