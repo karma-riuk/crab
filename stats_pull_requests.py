@@ -97,7 +97,7 @@ def process_repo(repo_name):
 
 def main():
     repos = pd.read_csv("results.csv")
-    repos = repos[repos["good_repo_for_crab"] == True]
+    repos = repos[(repos["good_repo_for_crab"] == True) & (repos["n_tests"] > 0)]
     stats = []
     
     try:
