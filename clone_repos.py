@@ -13,6 +13,7 @@ EXCLUSION_LIST = [
     "edmcouncil/idmp", # requires authentication
     "aosp-mirror/platform_frameworks_base", # takes ages to clone
     "alibaba/druid", # tests takes literally more than 5 hours
+    "hashgraph/hedera-mirror-node", # requires authentication
 ]
 
 def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
