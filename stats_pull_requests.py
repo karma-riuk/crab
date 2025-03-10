@@ -26,8 +26,27 @@ def has_only_1_round_of_comments(commits, comments):
     if not comments or not commits:
         return False
     
-    commit_dates = [parse_date(c.commit.author.date) for c in commits]
-    comment_dates = [parse_date(c.created_at) for c in comments]
+    commit_dates = []
+    for commit in commits:
+        if isinstance(commit.commit.author.date, str):
+            commit_dates.append(parse_date(commit.commit.author.date))
+        elif isinstance(commit.commit.author.date, datetime):
+            commit_dates.append(commit.commit.author.date)
+        else:
+            logging.warning(f"The commit {commit.sha} has an unexpected date format: {commit.commit.author.date}")
+            logging.warning(f"Tied to PR: {comments[0]['pull_request_url']}")
+            return False
+
+    comment_dates = []
+    for comment in comments:
+        if isinstance(comment.created_at, str):
+            comment_dates.append(parse_date(comment.created_at))
+        elif isinstance(comment.created_at, datetime):
+            comment_dates.append(comment.created_at)
+        else:
+            logging.warning(f"The comment {comment['id']} has an unexpected date format: {comment['created_at']}")
+            logging.warning(f"Tied to PR: {comment['pull_request_url']}")
+            return False
     
     commit_dates.sort()
     comment_dates.sort()
