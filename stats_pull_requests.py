@@ -7,12 +7,15 @@ from github import Github
 # Initialize GitHub API client
 g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
 
+def parse_date(date: str) -> datetime:
+    return datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
+
 def has_only_1_round_of_comments(commits, comments):
     if not comments or not commits:
         return False
     
-    commit_dates = [c.commit.author.date for c in commits]
-    comment_dates = [c.created_at for c in comments]
+    commit_dates = [parse_date(c.commit.author.date) for c in commits]
+    comment_dates = [parse_date(c.created_at) for c in comments]
     
     commit_dates.sort()
     comment_dates.sort()
@@ -20,11 +23,19 @@ def has_only_1_round_of_comments(commits, comments):
     first_comment_time = comment_dates[0]
     last_comment_time = comment_dates[-1]
     
+    n_before = n_after = 0
     for commit_time in commit_dates:
+        if commit_time < first_comment_time:
+            n_before += 1
+            continue
+        if commit_time > last_comment_time:
+            n_after += 1
+            continue
+
         if first_comment_time < commit_time < last_comment_time:
             return False
     
-    return True
+    return n_before >= 1 and n_after >= 1
 
 def process_pull(repo, pull):
     commits = list(pull.get_commits())
