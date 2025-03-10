@@ -4,20 +4,21 @@ import pandas as pd
 import tqdm
 from github import Github
 
-# Set up logging
-log_file = "github_api.log"
-logging.basicConfig(
-    filename=log_file,
-    level=logging.WARNING,  # Adjust as needed
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-
-# Redirect PyGithub logging
-logging.getLogger("github.Requester").setLevel(logging.WARNING)
-
 # Initialize GitHub API client
 g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
+
+def move_github_logging_to_file():
+    github_logger = logging.getLogger("github")
+
+    # Remove existing handlers to prevent duplicate logging
+    for handler in github_logger.handlers[:]:
+        github_logger.removeHandler(handler)
+
+    file_handler = logging.FileHandler("github_api.log")  # Log to file
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(formatter)
+    github_logger.addHandler(file_handler)
+    github_logger.propagate = False  # Prevent logging to standard output
 
 def parse_date(date: str) -> datetime:
     return datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
@@ -96,6 +97,8 @@ def process_repo(repo_name):
     return stats
 
 def main():
+    move_github_logging_to_file()
+
     repos = pd.read_csv("results.csv")
     repos = repos[(repos["good_repo_for_crab"] == True) & (repos["n_tests"] > 0)]
     stats = []
