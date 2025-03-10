@@ -1,8 +1,20 @@
-import os
+import os, logging
 from datetime import datetime
 import pandas as pd
 import tqdm
 from github import Github
+
+# Set up logging
+log_file = "github_api.log"
+logging.basicConfig(
+    filename=log_file,
+    level=logging.WARNING,  # Adjust as needed
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+
+# Redirect PyGithub logging
+logging.getLogger("github.Requester").setLevel(logging.WARNING)
 
 # Initialize GitHub API client
 g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
