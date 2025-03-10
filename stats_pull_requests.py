@@ -67,11 +67,13 @@ def process_repo(repo_name):
     repo = g.get_repo(repo_name)
     stats = []
     
-    for pull in tqdm.tqdm(list(repo.get_pulls(state="closed")), desc=repo_name, leave=False):
-        if not pull.merged_at:
-            continue
+    with tqdm.tqdm(list(repo.get_pulls(state="closed")), desc=repo_name, leave=False) as pbar:
+        for pull in pbar:
+            pbar.set_postfix({"started at": datetime.now().strftime("%d/%m, %H:%M:%S")})
+            if not pull.merged_at:
+                continue
         
-        stats.append(process_pull(repo, pull))
+            stats.append(process_pull(repo, pull))
     return stats
 
 def main():
