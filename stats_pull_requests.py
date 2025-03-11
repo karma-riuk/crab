@@ -69,6 +69,40 @@ def has_only_1_round_of_comments(commits, comments):
     
     return n_before >= 1 and n_after >= 1
 
+def has_only_1_comment(commits, comments):
+    if not comments or not commits:
+        return False
+
+    commit_dates = []
+    for commit in commits:
+        if isinstance(commit.commit.author.date, str):
+            commit_dates.append(parse_date(commit.commit.author.date))
+        elif isinstance(commit.commit.author.date, datetime):
+            commit_dates.append(commit.commit.author.date)
+        else:
+            logging.warning(f"The commit {commit.sha} has an unexpected date format: {commit.commit.author.date}")
+            logging.warning(f"Tied to PR: {comments[0]['pull_request_url']}")
+            return False
+    commit_dates.sort()
+
+    if isinstance(comments[0].created_at, datetime):
+        comment_date = comments[0].created_at
+    elif isinstance(comments[0].created_at, str):
+        comment_date = parse_date(comments[0].created_at)
+    else:
+        logging.warning(f"The comment {comments[0]['id']} has an unexpected date format: {comments[0]['created_at']}")
+        return False
+
+    n_before = n_after = 0
+    for commit_date in commit_dates:
+        if commit_date < comment_date:
+            n_before += 1
+            continue
+        if commit_date > comment_date:
+            n_after += 1
+            continue
+    return n_before >= 1 and n_after >= 1
+
 def process_pull(repo, pull):
     commits = list(pull.get_commits())
     comments = list(pull.get_review_comments())
@@ -80,7 +114,7 @@ def process_pull(repo, pull):
         "deletions": pull.deletions,
         "changed_files": pull.changed_files,
         "has_only_1_round_of_comments": has_only_1_round_of_comments(commits, comments),
-        "has_only_1_comment": len(comments) == 1,
+        "has_only_1_comment": has_only_1_comment(commits, comments),
     }
 
 def process_repo(repo_name):
