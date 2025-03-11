@@ -107,8 +107,8 @@ def main():
         for _, row in tqdm.tqdm(repos.iterrows(), total=len(repos)):
             if "name" not in row or not isinstance(row["name"], str):
                 continue
-            pd.DataFrame(stats).to_csv("pr_stats.csv", index=False)
             stats.extend(process_repo(row["name"]))
+            pd.DataFrame(stats).to_csv("pr_stats.csv", index=False)
     finally:
         pd.DataFrame(stats).to_csv("pr_stats.csv", index=False)
 
