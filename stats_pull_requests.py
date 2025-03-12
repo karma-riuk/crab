@@ -1,8 +1,10 @@
 import os, logging
 from datetime import datetime
 import pandas as pd
-import tqdm
+from tqdm import tqdm
 from github import Github
+
+tqdm.pandas()
 
 # Initialize GitHub API client
 g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
@@ -56,7 +58,7 @@ def has_only_1_round_of_comments(commits, comments):
     last_comment_time = comment_dates[-1]
     
     n_before = n_after = 0
-    for commit_time in commit_dates:
+    for commit_time in tqdm(commit_dates, desc="Checking for 1 round of comments", leave=False):
         if commit_time < first_comment_time:
             n_before += 1
             continue
@@ -94,7 +96,7 @@ def has_only_1_comment(commits, comments):
         return False
 
     n_before = n_after = 0
-    for commit_date in commit_dates:
+    for commit_date in tqdm(commit_dates, desc="Checking for 1 comment", leave=False):
         if commit_date < comment_date:
             n_before += 1
             continue
@@ -121,7 +123,7 @@ def process_repo(repo_name):
     repo = g.get_repo(repo_name)
     stats = []
     
-    with tqdm.tqdm(list(repo.get_pulls(state="closed")), desc=repo_name, leave=False) as pbar:
+    with tqdm(list(repo.get_pulls(state="closed")), desc=repo_name, leave=False) as pbar:
         for pull in pbar:
             pbar.set_postfix({"started at": datetime.now().strftime("%d/%m, %H:%M:%S")})
             if not pull.merged_at:
@@ -131,14 +133,12 @@ def process_repo(repo_name):
     return stats
 
 def main():
-    move_github_logging_to_file()
-
     repos = pd.read_csv("results.csv")
     repos = repos[(repos["good_repo_for_crab"] == True) & (repos["n_tests"] > 0)]
     stats = []
     
     try:
-        for _, row in tqdm.tqdm(repos.iterrows(), total=len(repos)):
+        for _, row in tqdm(repos.iterrows(), total=len(repos)):
             if "name" not in row or not isinstance(row["name"], str):
                 continue
             stats.extend(process_repo(row["name"]))
@@ -147,4 +147,5 @@ def main():
         pd.DataFrame(stats).to_csv("pr_stats.csv", index=False)
 
 if __name__ == "__main__":
+    move_github_logging_to_file()
     main()
