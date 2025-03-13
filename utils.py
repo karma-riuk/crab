@@ -1,4 +1,5 @@
 from datetime import datetime
+from tqdm import tqdm
 import logging
 
 def parse_date(date: str) -> datetime:
