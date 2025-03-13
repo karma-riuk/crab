@@ -258,7 +258,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Clone repos from a given file")
     parser.add_argument("file", default="results.csv.gz", help="The file to download the repos from. Default is 'results.csv.gz'")
     parser.add_argument("-d", "--dest", default="./results/", help="The root directory in which to download the repos. Default is './results/'")
-    parser.add_argument("-r", "--results", default="results.csv", help="The name of file in which to save the results. Also used with --continue. Default is 'results.csv'")
+    parser.add_argument("-r", "--results", default="good_repos.csv", help="The name of file in which to save the results. Also used with --continue. Default is 'good_repos.csv'")
     parser.add_argument("-l", "--lazy", action="store_true", help="If given, the program will continue from where it left off, by not touch the already processed repos. Will look at the file pointed by the --results argument")
     parser.add_argument("-f", "--force", action="store_true", help="Force the download of the repos")
     parser.add_argument("-v", "--verbose", action="store_true", help="Make the program verbose")
