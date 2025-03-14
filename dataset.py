@@ -28,6 +28,9 @@ class DatasetEntry:
 class Dataset:
     entries: List = field(default_factory=list)
 
+    def __len__(self) -> int:
+        return len(self.entries)
+
     def to_json(self, filename: str):
         """Serialize the dataset to a JSON file"""
         with open(filename, "w", encoding="utf-8") as f:
