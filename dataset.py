@@ -34,7 +34,7 @@ class Dataset:
     entries: List[DatasetEntry] = field(default_factory=list)
 
     def __len__(self) -> int:
-        return len(self.entries)
+        return sum(1 for entry in self.entries if entry.metadata.successful)
 
     def to_json(self, filename: str):
         """Serialize the dataset to a JSON file"""
