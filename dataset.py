@@ -17,12 +17,17 @@ class Metadata:
     last_cmd_error_msg: str = ""
 
 @dataclass
+class Diff:
+    filename: str
+    patch: str
+
+@dataclass
 class DatasetEntry:
     metadata: Metadata
     files: List[FileData] # files before the PR (before the first PR commits)
-    diffs_before: List[str] # diffs between the opening of the PR and the comment
+    diffs_before: List[Diff] # diffs between the opening of the PR and the comment
     comment: str
-    diffs_after: List[str] # changes after the comment
+    diffs_after: List[Diff] # changes after the comment
 
 @dataclass
 class Dataset:
