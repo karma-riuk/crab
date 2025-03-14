@@ -11,19 +11,17 @@ from dataset import Dataset, DatasetEntry, FileData, Metadata, Diff
 from utils import has_only_1_comment
 
 
-def get_good_projects(csv_file: str, verbose: bool = False) -> pd.DataFrame:
+def get_good_projects(csv_file: str) -> pd.DataFrame:
     """
     Extracts the good (the ones that compile and test successfully, and that
     have at least one test) from the given file.
     
     Parameters:
     csv_file (str): The csv file containing the projects.
-    verbose (bool): Whether to print the number of good projects.
 
     Returns:
     pd.DataFrame: The good projects.
     """
-    if verbose: print(f"Reading {csv_file}...")
     df = pd.read_csv(csv_file)
     return df.loc[(df['good_repo_for_crab'] == True) & (df['n_tests'] > 0)]
 
@@ -83,7 +81,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset):
         diffs_after=diffs_after,
     ))
 
-def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset, verbose: bool = False):
+def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset):
     good_prs = []
     repo = g.get_repo(repo_name)
     good_prs = get_good_prs(repo, stats_df)
@@ -91,7 +89,7 @@ def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Data
     for pr in tqdm(good_prs, desc="Processing good prs", leave=False):
         process_pull(repo, pr, dataset)
 
-def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset, verbose: bool = False):
+def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset):
     """
     Processes the repos in the given csv file, extracting the good ones and
     creating the "triplets" for the dataset.
@@ -102,7 +100,7 @@ def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset, ver
         Passing it by reference in order have the latest information, in case of an error
     verbose (bool): Whether to be verbose or not
     """
-    df = get_good_projects(csv_file, verbose=verbose)
+    df = get_good_projects(csv_file)
     stats_df = pd.read_csv(stats_csv) if stats_csv is not None else None
     already_processed_repos = []
     potentially_good_repos = []
@@ -131,7 +129,7 @@ if __name__ == "__main__":
     parser.add_argument('csv_file', type=str, help='The csv file containing the projects (the results from clone_repos.py).')
     parser.add_argument('-o', '--output', type=str, default="./dataset.json", help='The file in which the dataset will be contained. Default is "./dataset.json"')
     parser.add_argument('-s', '--stats', type=str, help="The name of the output file from the stats_pull_requests.py. The stats file already knows which PRs are good (the ones with only 1 comment between two rounds of commits), so instead of going through all of PRs of a repo, we can fast-track using this. If the repo isn't in the stats file, we must go through each PR")
-    parser.add_argument('-v', '--verbose', action='store_true', help='Prints the number of good projects.')
+    # parser.add_argument('-v', '--verbose', action='store_true', help='Prints the number of good projects.')
 
     args = parser.parse_args()
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
@@ -139,6 +137,6 @@ if __name__ == "__main__":
     dataset = Dataset()
     try:
         # try and finally to save, regardless of an error occuring or the program finished correctly
-        process_repos(args.csv_file, args.stats, dataset, verbose=args.verbose)
+        process_repos(args.csv_file, args.stats, dataset)
     finally:
         dataset.to_json(args.output)
