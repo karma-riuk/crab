@@ -87,7 +87,7 @@ def is_already_repo_cloned(repos_dir: str, repo_name: str) -> bool:
     repo_name (str): The name of the repository.
 
     Returns:
-    bool: True if the repository is correctly cloned, False otherwise.
+    bool: True if the repository is already cloned, False otherwise.
     """
     path = os.path.join(repos_dir, repo_name)
 
@@ -110,7 +110,7 @@ def is_already_repo_cloned(repos_dir: str, repo_name: str) -> bool:
     except subprocess.CalledProcessError:
         return False
 
-def clone(repo: str, dest: str, updates: dict = {}, force: bool = False, verbose: bool = False) -> None:
+def clone(repo: str, dest: str, updates: dict = {}, force: bool = False, verbose: bool = False) -> bool:
     """
     Clones a GitHub repository into a local directory.
 
@@ -120,12 +120,15 @@ def clone(repo: str, dest: str, updates: dict = {}, force: bool = False, verbose
         updates (dict, optional): A dictionary to store updates about the cloning process.
         force (bool): Whether to force the cloning process, even if the repository already exists.
         verbose (bool): Whether to print verbose output.
+
+    Returns:
+        bool: True if the repository is successfully cloned, False otherwise.
     """
     local_repo_path = os.path.join(dest, repo)
     if not force and is_already_repo_cloned(dest, repo):
         # if verbose: print(f"Skipping {repo}, already exists")
         updates["cloned_successfully"] = "Already exists"
-        return 
+        return True
 
     if verbose: print(f"Cloning {repo}")
     proc = subprocess.run(
@@ -140,5 +143,7 @@ def clone(repo: str, dest: str, updates: dict = {}, force: bool = False, verbose
         error_msg = proc.stderr.decode()
         print(error_msg, file=sys.stderr)
         updates["error_msg"] = error_msg
+        return False
     else:
         updates["cloned_successfully"] = True
+        return True
