@@ -8,7 +8,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from dataset import Dataset, DatasetEntry, FileData, Metadata, Diff
-from utils import has_only_1_comment
+from utils import has_only_1_comment, move_github_logging_to_file
 
 
 def get_good_projects(csv_file: str) -> pd.DataFrame:
@@ -133,6 +133,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
+    move_github_logging_to_file()
 
     dataset = Dataset()
     try:
