@@ -3,6 +3,20 @@ from github.Commit import Commit
 from github.PaginatedList import PaginatedList
 from github.PullRequestComment import PullRequestComment
 from tqdm import tqdm
+import logging
+
+def move_github_logging_to_file():
+    github_logger = logging.getLogger("github")
+
+    # Remove existing handlers to prevent duplicate logging
+    for handler in github_logger.handlers[:]:
+        github_logger.removeHandler(handler)
+
+    file_handler = logging.FileHandler("github_api.log")  # Log to file
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(formatter)
+    github_logger.addHandler(file_handler)
+    github_logger.propagate = False  # Prevent logging to standard output
 
 def parse_date(date: str) -> datetime:
     return datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")

@@ -1,27 +1,14 @@
-import os, logging
+import os
 from datetime import datetime
 import pandas as pd
 from tqdm import tqdm
 from github import Github
-from utils import has_only_1_round_of_comments, has_only_1_comment
+from utils import has_only_1_round_of_comments, has_only_1_comment, move_github_logging_to_file
 
 tqdm.pandas()
 
 # Initialize GitHub API client
 g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
-
-def move_github_logging_to_file():
-    github_logger = logging.getLogger("github")
-
-    # Remove existing handlers to prevent duplicate logging
-    for handler in github_logger.handlers[:]:
-        github_logger.removeHandler(handler)
-
-    file_handler = logging.FileHandler("github_api.log")  # Log to file
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    file_handler.setFormatter(formatter)
-    github_logger.addHandler(file_handler)
-    github_logger.propagate = False  # Prevent logging to standard output
 
 def process_pull(repo, pull):
     commits = pull.get_commits()
