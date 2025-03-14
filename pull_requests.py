@@ -1,8 +1,8 @@
+import argparse, os, subprocess
 from typing import Optional
 from github.PullRequest import PullRequest
 from github.Repository import Repository
 import pandas as pd
-import argparse, os
 from github import Github
 from tqdm import tqdm
 from datetime import datetime
@@ -57,7 +57,7 @@ def get_good_prs(repo: Repository, stats_df: Optional[pd.DataFrame]) -> list[Pul
 
     return good_prs
 
-def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset):
+def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir: str):
     commits = list(pr.get_commits())
     if not commits:
         return  # No commits, skip processing
@@ -73,6 +73,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset):
 
     diffs_after = [Diff(file.filename, file.patch) for file in repo.compare(first_commit.sha, last_commit.sha).files]
 
+
     dataset.entries.append(DatasetEntry(
         metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, True),
         files=[FileData(file.filename) for file in pr.get_files()],
@@ -81,15 +82,15 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset):
         diffs_after=diffs_after,
     ))
 
-def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset):
+def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str):
     good_prs = []
     repo = g.get_repo(repo_name)
     good_prs = get_good_prs(repo, stats_df)
 
     for pr in tqdm(good_prs, desc="Processing good prs", leave=False):
-        process_pull(repo, pr, dataset)
+        process_pull(repo, pr, dataset, repos_dir)
 
-def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset):
+def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset, repos_dir: str):
     """
     Processes the repos in the given csv file, extracting the good ones and
     creating the "triplets" for the dataset.
@@ -120,7 +121,7 @@ def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset):
             if repo_name in already_processed_repos and repo_name not in potentially_good_repos:
                 pbar.update(1)
                 continue # skipping because we know there's nothing good already
-            process_repo(repo_name, stats_df, dataset)
+            process_repo(repo_name, stats_df, dataset, repos_dir)
             pbar.update(1)
 
 
@@ -128,6 +129,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Creates the triplets for the CRAB dataset.')
     parser.add_argument('csv_file', type=str, help='The csv file containing the projects (the results from clone_repos.py).')
     parser.add_argument('-o', '--output', type=str, default="./dataset.json", help='The file in which the dataset will be contained. Default is "./dataset.json"')
+    parser.add_argument('-r', '--repos', type=str, default="./results/", help='The directory in which the repos were cloned (will be cloned if they aren\'t there already). Default: "./results/"')
     parser.add_argument('-s', '--stats', type=str, help="The name of the output file from the stats_pull_requests.py. The stats file already knows which PRs are good (the ones with only 1 comment between two rounds of commits), so instead of going through all of PRs of a repo, we can fast-track using this. If the repo isn't in the stats file, we must go through each PR")
     # parser.add_argument('-v', '--verbose', action='store_true', help='Prints the number of good projects.')
 
@@ -138,6 +140,6 @@ if __name__ == "__main__":
     dataset = Dataset()
     try:
         # try and finally to save, regardless of an error occuring or the program finished correctly
-        process_repos(args.csv_file, args.stats, dataset)
+        process_repos(args.csv_file, args.stats, args.repos, dataset)
     finally:
         dataset.to_json(args.output)

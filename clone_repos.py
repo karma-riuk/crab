@@ -1,11 +1,12 @@
 import pandas as pd
-import argparse, os, sys, subprocess, docker
+import argparse, os, sys, docker
 from tqdm import tqdm
 import shutil
 from typing import Optional
 from datetime import datetime
 
 from handlers import GradleHandler, MavenHandler, BuildHandler
+from utils import clone
 
 tqdm.pandas()
 
@@ -16,36 +17,6 @@ EXCLUSION_LIST = [
     "hashgraph/hedera-mirror-node", # requires authentication
     "Starcloud-Cloud/starcloud-llmops", # requires authentication
 ]
-
-def clone(repo: str, dest: str, updates: dict, force: bool = False, verbose: bool = False) -> None:
-    """
-    Clones a GitHub repository into a local directory.
-
-    Args:
-        repo (str): The repository to clone, in the format "owner/repo_name".
-        force (bool, optional): If `True`, re-clones the repository even if it already exists. Defaults to `False`.
-    """
-    local_repo_path = os.path.join(dest, repo)
-    if not force and os.path.exists(local_repo_path):
-        # if verbose: print(f"Skipping {repo}, already exists")
-        updates["cloned_successfully"] = "Already exists"
-        return 
-
-    if verbose: print(f"Cloning {repo}")
-    proc = subprocess.run(
-        ["git", "clone", "--depth", "1", f"https://github.com/{repo}", local_repo_path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    if proc.returncode != 0:
-        updates["cloned_successfully"] = False
-        print(f"Failed to clone {repo}", file=sys.stderr)
-        print(f"Error message was:", file=sys.stderr)
-        error_msg = proc.stderr.decode()
-        print(error_msg, file=sys.stderr)
-        updates["error_msg"] = error_msg
-    else:
-        updates["cloned_successfully"] = True
 
 def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False) -> Optional[BuildHandler]:
     """
