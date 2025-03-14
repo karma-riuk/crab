@@ -32,19 +32,19 @@ class BuildHandler(ABC):
         self.container.remove()
 
 
-    def has_tests(self) -> bool:
+    def check_for_tests(self) -> None:
         with open(os.path.join(self.path, self.build_file), "r") as f:
             content = f.read()
 
             for library in ["junit", "testng", "mockito"]:
                 if library in content:
                     self.updates["detected_source_of_tests"] = library + " library in build file"
-                    return True
+                    return
 
             for keyword in ["testImplementation", "functionalTests", "bwc_tests_enabled"]:
                 if keyword in content:
                     self.updates["detected_source_of_tests"] = keyword + " keyword in build file"
-                    return False
+                    return
 
         test_dirs = [
             "src/test/java",
@@ -55,12 +55,10 @@ class BuildHandler(ABC):
         for td in test_dirs:
             if os.path.exists(os.path.join(self.path, td)):
                 self.updates["detected_source_of_tests"] = td + " dir exists in repo"
-                return True
 
-        self.updates["error_msg"] = "No tests found"
-        return False
+        raise NoTestsFoundError("No tests found")
 
-    def compile_repo(self) -> bool:
+    def compile_repo(self) -> None:
         def timeout_handler(signum, frame):
            raise TimeoutError("Tests exceeded time limit")
 
@@ -71,21 +69,14 @@ class BuildHandler(ABC):
             exec_result = self.container.exec_run(self.compile_cmd())
             output = clean_output(exec_result.output)
             if exec_result.exit_code != 0:
-                self.updates["compiled_successfully"] = False
-                self.updates["error_msg"] = output
-                return False
-            
-            self.updates["compiled_successfully"] = True 
-            return True
+                raise FailedToCompileError(output)
         except TimeoutError:
             self.updates["compiled_successfully"] = False
             self.updates["error_msg"] = "Compile process killed due to exceeding the 1-hour time limit"
-            return False
-
         finally:
             signal.alarm(0)  # Cancel the alarm
 
-    def test_repo(self) -> bool:
+    def test_repo(self) -> None:
         def timeout_handler(signum, frame):
            raise TimeoutError("Tests exceeded time limit")
 
@@ -96,19 +87,14 @@ class BuildHandler(ABC):
             exec_result = self.container.exec_run(self.test_cmd())
             output = clean_output(exec_result.output)
             if exec_result.exit_code != 0:
-                self.updates["tested_successfully"] = False
-                self.updates["error_msg"] = output
-                return False
+                raise FailedToTestError(output)
             
-            self.updates["tested_successfully"] = True
-            self.updates["error_msg"] = output
-
-            return self.extract_test_numbers(output)
+            self.extract_test_numbers(output)
 
         except TimeoutError:
             self.updates["tested_successfully"] = False
             self.updates["error_msg"] = "Test process killed due to exceeding the 1-hour time limit"
-            return False
+            return
 
         finally:
             signal.alarm(0)  # Cancel the alarm
@@ -126,7 +112,7 @@ class BuildHandler(ABC):
         pass
 
     @abstractmethod
-    def extract_test_numbers(self, output: str) -> bool:
+    def extract_test_numbers(self, output: str) -> None:
         pass
 
     @abstractmethod
@@ -157,7 +143,7 @@ class MavenHandler(BuildHandler):
     def container_name(self) -> str:
         return "crab-maven"
 
-    def extract_test_numbers(self, output: str) -> bool:
+    def extract_test_numbers(self, output: str) -> None:
         pattern = r"\[INFO\] Results:\n\[INFO\]\s*\n\[INFO\] Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)"
 
         matches = re.findall(pattern, output)
@@ -169,8 +155,7 @@ class MavenHandler(BuildHandler):
         self.updates["n_tests_skipped"] = 0
 
         if len(matches) == 0:
-            self.updates["error_msg"] = "No test results found in Maven output:\n" + output
-            return False
+            raise NoTestResultsToExtractError("No test results found in Maven output:\n" + output)
 
         for match in matches:
             tests_run, failures, errors, skipped = map(int, match)
@@ -179,10 +164,6 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_errors"] += errors
             self.updates["n_tests_skipped"] += skipped
             self.updates["n_tests_passed"] += (tests_run - (failures + errors))  # Calculate passed tests
-
-        return True
-
-        
 
 class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
@@ -201,7 +182,7 @@ class GradleHandler(BuildHandler):
     def container_name(self) -> str:
         return "crab-gradle"
 
-    def extract_test_numbers(self, output: str) -> bool:
+    def extract_test_numbers(self, output: str) -> None:
         self.updates["n_tests"] = -1
         self.updates["n_tests_passed"] = -1
         self.updates["n_tests_failed"] = -1
@@ -210,8 +191,7 @@ class GradleHandler(BuildHandler):
 
         test_results_path = os.path.join(self.path, "build/reports/tests/test/index.html")
         if not os.path.exists(test_results_path):
-            self.updates["error_msg"] = "No test results found (prolly a repo with sub-projects)"
-            return False
+            raise NoTestResultsToExtractError("No test results found (prolly a repo with sub-projects)")
 
         # Load the HTML file
         with open(test_results_path, "r") as file:
@@ -219,31 +199,38 @@ class GradleHandler(BuildHandler):
         
             test_div = soup.find("div", class_="infoBox", id="tests")
             if test_div is None:
-                self.updates["error_msg"] = "No test results found (no div.infoBox#tests)"
-                return False
+                raise NoTestResultsToExtractError("No test results found (no div.infoBox#tests)")
 
             counter_div = test_div.find("div", class_="counter")
             if counter_div is None:
-                self.updates["error_msg"] = "No test results found (not div.counter for tests)"
-                return False
+                raise NoTestResultsToExtractError("No test results found (not div.counter for tests)")
 
             self.updates["n_tests"] = int(counter_div.text.strip())
             
             failures_div = soup.find("div", class_="infoBox", id="failures")
             if failures_div is None:
-                self.updates["error_msg"] = "No test results found (no div.infoBox#failures)"
-                return False
+                raise NoTestResultsToExtractError("No test results found (no div.infoBox#failures)")
 
             counter_div = failures_div.find("div", class_="counter")
             if counter_div is None:
-                self.updates["error_msg"] = "No test results found (not div.counter for failures)"
-                return False
+                raise NoTestResultsToExtractError("No test results found (not div.counter for failures)")
 
             self.updates["n_tests_failed"] = int(counter_div.text.strip())
             
             # Calculate passed tests
             self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
-        return True
+
+class NoTestsFoundError(Exception):
+    pass
+
+class FailedToCompileError(Exception):
+    pass
+
+class FailedToTestError(Exception):
+    pass
+
+class NoTestResultsToExtractError(Exception):
+    pass
 
 def merge_download_lines(lines: list) -> list:
     """

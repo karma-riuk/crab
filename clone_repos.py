@@ -4,7 +4,7 @@ from tqdm import tqdm
 import shutil
 from datetime import datetime
 
-from handlers import get_build_handler
+from handlers import FailedToCompileError, FailedToTestError, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
 from utils import clone
 
 tqdm.pandas()
@@ -58,31 +58,48 @@ def process_row(repo, client, dest: str, updates: dict, force: bool = False, ver
 
         build_handler.set_client(client)
         with build_handler:
-            pbar.set_postfix_str("Checking for tests...")
-            if not build_handler.has_tests():
-                if verbose: print(f"Removing {repo}, no test suites")
+            try:
+                pbar.set_postfix_str("Checking for tests...")
+                build_handler.check_for_tests()
+                pbar.update(1)
+
+                pbar.set_postfix_str("Compiling...")
+                build_handler.compile_repo()
+                updates["compiled_successfully"] = True
+                pbar.update(1)
+
+                pbar.set_postfix_str("Running tests...")
+                build_handler.test_repo()
+                updates["tested_successfully"] = True
+                pbar.update(1)
+
+                build_handler.clean_repo()
+
+                # If repo was not removed, then it is a good repo
+                updates["good_repo_for_crab"] = True
+            except NoTestsFoundError as e:
+                updates["error_msg"] = str(e)
+                if verbose: print(f"Removing {repo}, error: no tests found")
                 remove_dir(repo_path)
                 return
-            if verbose: print(f"Keeping {repo}")
-            pbar.update(1)
-
-            pbar.set_postfix_str("Compiling...")
-            if not build_handler.compile_repo():
-                if verbose: print(f"Removing {repo}, failed to compile")
+            except FailedToCompileError as e:
+                updates["error_msg"] = str(e)
+                updates["compiled_successfully"] = False
+                if verbose: print(f"Removing {repo}, error: failed to compile")
                 remove_dir(repo_path)
                 return
-            pbar.update(1)
-
-            pbar.set_postfix_str("Running tests...")
-            if not build_handler.test_repo():
-                if verbose: print(f"Removing {repo}, failed to run tests")
+            except FailedToTestError as e:
+                updates["error_msg"] = str(e)
+                updates["tested_successfully"] = False
+                if verbose: print(f"Removing {repo}, error: failed to run tests")
                 remove_dir(repo_path)
                 return
-            build_handler.clean_repo()
-            pbar.update(1)
+            except NoTestResultsToExtractError as e:
+                updates["error_msg"] = str(e)
+                if verbose: print(f"Removing {repo}, error: failed to extract test results")
+                remove_dir(repo_path)
+                return
 
-            # If repo was not removed, then it is a good repo
-            updates["good_repo_for_crab"] = True
 
 def save_df_with_updates(df, updates_list, results_file: str, verbose=False):
    # Set the new data
