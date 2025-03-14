@@ -31,7 +31,7 @@ class DatasetEntry:
 
 @dataclass
 class Dataset:
-    entries: List = field(default_factory=list)
+    entries: List[DatasetEntry] = field(default_factory=list)
 
     def __len__(self) -> int:
         return len(self.entries)
