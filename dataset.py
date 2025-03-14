@@ -5,7 +5,7 @@ import json
 @dataclass
 class FileData:
     path: str
-    content: str # Not sure about this, maybe we should just keep the path and extract the contents dynamically (boh)
+    content: str = "" # Not sure about this, maybe we should just keep the path and extract the contents dynamically (boh)
 
 @dataclass
 class Metadata:
@@ -13,8 +13,8 @@ class Metadata:
     pr_number: int
     merge_commit_sha: str # to checkout for the tests
     successful: bool
-    reason_for_failure: str
-    last_cmd_error_msg: str
+    reason_for_failure: str = ""
+    last_cmd_error_msg: str = ""
 
 @dataclass
 class DatasetEntry:
