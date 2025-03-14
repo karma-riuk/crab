@@ -49,12 +49,12 @@ def has_only_1_comment(commits: PaginatedList[Commit], comments: PaginatedList[P
         if verbose: print(f"More than 1 comment: {comments.totalCount} comments")
         return False
 
-    commit_dates = [commit.commit.author.date for commit in tqdm(commits, total=commits.totalCount, desc="Extracting date from commits", leave=False)]
+    commit_dates = [commit.commit.author.date for commit in commits]
 
     comment_date = comments[0].created_at
 
     n_before = n_after = 0
-    for commit_date in tqdm(commit_dates, desc="Checking for 1 comment", leave=False):
+    for commit_date in commit_dates:
         if commit_date < comment_date:
             n_before += 1
             continue
