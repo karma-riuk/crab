@@ -1,11 +1,10 @@
 import pandas as pd
-import argparse, os, sys, docker
+import argparse, os, docker
 from tqdm import tqdm
 import shutil
-from typing import Optional
 from datetime import datetime
 
-from handlers import GradleHandler, MavenHandler, BuildHandler
+from handlers import get_build_handler
 from utils import clone
 
 tqdm.pandas()
@@ -17,55 +16,6 @@ EXCLUSION_LIST = [
     "hashgraph/hedera-mirror-node", # requires authentication
     "Starcloud-Cloud/starcloud-llmops", # requires authentication
 ]
-
-def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False) -> Optional[BuildHandler]:
-    """
-    Get the path to the build file of a repository. The build file is either a
-    `pom.xml`, `build.gradle`, or `build.xml` file.
-
-    Args:
-        root (str): The root directory in which the repository is located.
-        repo (str): The name of the repository.
-
-    Returns:
-        str | None: The path to the repository if it is valid, `None` otherwise
-    """
-    path = os.path.join(root, repo)
-    # Check if the given path is a directory
-    if not os.path.isdir(path):
-        error_msg = f"The path {path} is not a valid directory."
-        print(error_msg, file=sys.stderr)
-        updates["error_msg"] = error_msg
-        return None
-
-    to_keep = ["pom.xml", "build.gradle"]
-    for entry in os.scandir(path):
-        if entry.is_file() and entry.name in to_keep:
-            if verbose: print(f"Found {entry.name} in {repo} root, so keeping it and returning")
-            updates["depth_of_build_file"] = 0
-            if entry.name == "build.gradle":
-                updates["build_system"] = "gradle"
-                return GradleHandler(path, entry.name, updates)
-            else:
-                updates["build_system"] = "maven"
-                return MavenHandler(path, entry.name, updates)
-    
-    # List files in the immediate subdirectories
-    for entry in os.scandir(path):
-        if entry.is_dir():
-            for sub_entry in os.scandir(entry.path):
-                if sub_entry.is_file() and sub_entry.name in to_keep:
-                    if verbose: print(f"Found {sub_entry.name} in {repo} first level, so keeping it and returning")
-                    updates["depth_of_build_file"] = 1
-                    if entry.name == "build.gradle":
-                        updates["build_system"] = "gradle"
-                        return GradleHandler(path, os.path.join(entry.name, sub_entry.name), updates)
-                    else:
-                        updates["build_system"] = "maven"
-                        return MavenHandler(path, os.path.join(entry.name, sub_entry.name), updates)
-
-    updates["error_msg"] = "No build file found"
-    return None
 
 def remove_dir(dir: str) -> None:
     """
