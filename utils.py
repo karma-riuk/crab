@@ -45,6 +45,9 @@ def has_only_1_comment(commits: PaginatedList[Commit], comments: PaginatedList[P
     ):
         return False
 
+    if comments.totalCount != 1:
+        return False
+
     commit_dates = [commit.commit.author.date for commit in tqdm(commits, total=commits.totalCount, desc="Extracting date from commits", leave=False)]
     commit_dates.sort()
 
