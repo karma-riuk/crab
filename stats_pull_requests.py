@@ -24,8 +24,8 @@ def move_github_logging_to_file():
     github_logger.propagate = False  # Prevent logging to standard output
 
 def process_pull(repo, pull):
-    commits = list(pull.get_commits())
-    comments = list(pull.get_review_comments())
+    commits = pull.get_commits()
+    comments = pull.get_review_comments()
     
     return {
         "repo": repo.full_name,
