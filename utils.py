@@ -3,7 +3,6 @@ from github.Commit import Commit
 from github.PaginatedList import PaginatedList
 from github.PullRequestComment import PullRequestComment
 from tqdm import tqdm
-import logging
 
 def parse_date(date: str) -> datetime:
     return datetime.strptime(date, "%Y-%m-%dT%H:%M:%SZ")
