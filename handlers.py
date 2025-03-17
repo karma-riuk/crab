@@ -272,8 +272,8 @@ class GradleHandler(BuildHandler):
             # Calculate passed tests
             self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
 
-        return os.path.join(self.path, "build/reports/jacoco/test/html/index.html")
     def get_jacoco_report_paths(self) -> Generator[str]:
+        raise GradleAggregateReportNotFound("Gradle does not generate a single coverage report file")
 
 class NoTestsFoundError(Exception):
     pass
