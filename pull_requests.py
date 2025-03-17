@@ -70,6 +70,10 @@ def ensure_full_history(repo_path: str) -> None:
     if result.stdout.strip() == "true":
         run_git_cmd(["fetch", "--unshallow"], repo_path)
 
+def reset_repo_to_latest_commit(repo_path: str) -> None:
+    current_branch = run_git_cmd(["rev-parse", "--abbrev-ref", "HEAD"], repo_path).stdout.strip()
+    run_git_cmd(["checkout", current_branch], repo_path)
+
 def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir: str):
     commits = list(pr.get_commits())
     if not commits:
@@ -144,6 +148,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
             entry.metadata.successful = False
         finally:
             build_handler.clean_repo()
+            reset_repo_to_latest_commit(repo_path)
 
     dataset.to_json(args.output)
 
