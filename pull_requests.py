@@ -61,6 +61,15 @@ def get_good_prs(repo: Repository, stats_df: Optional[pd.DataFrame]) -> list[Pul
 
     return good_prs
 
+def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", repo_path] + cmd, check=True, capture_output=True, text=True)
+
+def ensure_full_history(repo_path: str) -> None:
+    result = run_git_cmd(["rev-parse", "--is-shallow-repository"], repo_path)
+
+    if result.stdout.strip() == "true":
+        run_git_cmd(["fetch", "--unshallow"], repo_path)
+
 def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir: str):
     commits = list(pr.get_commits())
     if not commits:
@@ -94,9 +103,10 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         entry.metadata.successful = False
 
     try:
-        subprocess.run(["git", "-C", repo_path, "checkout", pr.merge_commit_sha], check=True)
+        ensure_full_history(repo_path)
+        run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
     except subprocess.CalledProcessError as e:
-        entry.metadata.last_cmd_error_msg = e.stderr
+        entry.metadata.last_cmd_error_msg = f"stdout: {e.stdout}\n\n\nstderr: {e.stderr}"
         entry.metadata.reason_for_failure = f"Couldn't checkout the commit '{pr.merge_commit_sha}'"
         entry.metadata.successful = False
         return
