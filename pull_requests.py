@@ -110,8 +110,8 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         ensure_full_history(repo_path)
         run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
     except subprocess.CalledProcessError as e:
-        entry.metadata.last_cmd_error_msg = f"stdout: {e.stdout}\n\n\nstderr: {e.stderr}"
-        entry.metadata.reason_for_failure = f"Couldn't checkout the commit '{pr.merge_commit_sha}'"
+        entry.metadata.last_cmd_error_msg = f"{e.stderr}"
+        entry.metadata.reason_for_failure = f"Couldn't checkout the commit"
         entry.metadata.successful = False
         return
 
