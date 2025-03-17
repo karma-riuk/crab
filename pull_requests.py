@@ -82,16 +82,16 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     first_commit = commits[0]
     last_commit = commits[-1]
 
-    diffs_before = [Diff(file.filename, file.patch) for file in repo.compare(pr.base.sha, first_commit.sha).files]
+    diffs_before = {file.filename: file.patch for file in repo.compare(pr.base.sha, first_commit.sha).files}
 
     comments = list(pr.get_review_comments())
     assert len(comments) == 1
     comment_text = comments[0].body if comments else ""
 
-    diffs_after = [Diff(file.filename, file.patch) for file in repo.compare(first_commit.sha, last_commit.sha).files]
+    diffs_after = {file.filename: file.patch for file in repo.compare(first_commit.sha, last_commit.sha).files}
     entry = DatasetEntry(
         metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha),
-        files=[FileData(file.filename) for file in pr.get_files()],
+        files={file.filename: FileData(file.filename) for file in pr.get_files()},
         diffs_before=diffs_before,
         comment=comment_text,
         diffs_after=diffs_after,
