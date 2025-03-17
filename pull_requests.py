@@ -8,7 +8,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from dataset import Dataset, DatasetEntry, FileData, Metadata, Diff
-from handlers import CantExecJacoco, FailedToCompileError, FailedToTestError, FileNotCovered, NoCoverageReportFound, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
+from handlers import CantExecJacoco, FailedToCompileError, FailedToTestError, FileNotCovered, GradleAggregateReportNotFound, NoCoverageReportFound, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone
 
 
@@ -124,9 +124,27 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     entry.metadata.build_system = build_handler.get_type()
     build_handler.set_client(docker_client)
         
-    def _check_coverage(files: list[str]):
-        for file in files:
-            build_handler.check_coverage(file)
+    def _check_coverage(filenames: list[str]):
+        should_throw = True
+        error = None
+        for filename in filenames:
+            try:
+                # first run the coverage over all the files, and then throw if
+                # it's necessary I wouldn't want to throw away this entry if
+                # one of the files inside the PR is a README (which is by
+                # default not covered by any tests). I want to consider it
+                # successful if at least one of the files is covered. Then I
+                # want to exclude manually if it isn't good
+
+                entry.files[filename].coverage = build_handler.check_coverage(filename)
+                # if we didn't throw, it means that the file was covered
+                should_throw = False
+            except FileNotCovered as e:
+                error = e
+
+        if should_throw and error is not None:
+            raise error
+
         
     steps = [
         ("Checking for tests...", build_handler.check_for_tests),
@@ -144,6 +162,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         CantExecJacoco: "Couldn't execute jacoco",
         NoCoverageReportFound: "No coverage report was found",
         FileNotCovered: "Files from the PR were not covered",
+        GradleAggregateReportNotFound: "Couldn't find the aggregate report (with gradle it's messy)",
     }
 
     with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
