@@ -225,7 +225,7 @@ class GradleHandler(BuildHandler):
         return f"{self.base_cmd} clean"
     
     def generate_coverage_report_cmd(self) -> str:
-        return f"{self.base_cmd}jacocoTestReport"
+        return f"{self.base_cmd} jacocoTestReport"
 
     def container_name(self) -> str:
         return "crab-gradle"
