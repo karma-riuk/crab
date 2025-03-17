@@ -125,6 +125,10 @@ class BuildHandler(ABC):
         self.container.exec_run(self.clean_cmd())
 
     @abstractmethod
+    def get_type(self) -> str:
+        pass
+
+    @abstractmethod
     def compile_cmd(self) -> str:
         pass
 
@@ -159,6 +163,9 @@ class MavenHandler(BuildHandler):
         # -B (Batch Mode): Runs Maven in non-interactive mode, reducing output and removing download progress bars.
         # -Dstyle.color=never: Disables ANSI colors.
         # -Dartifact.download.skip=true: Prevents Maven from printing download logs (but still downloads dependencies when needed).
+
+    def get_type(self) -> str:
+        return "maven"
 
     def compile_cmd(self) -> str:
         return f"{self.base_cmd} clean compile"
@@ -204,6 +211,9 @@ class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
         super().__init__(repo_path, build_file, updates)
         self.base_cmd = "gradle --no-daemon --console=plain"
+
+    def get_type(self) -> str:
+        return "gradle"
 
     def compile_cmd(self) -> str:
         return f"{self.base_cmd} compileJava"

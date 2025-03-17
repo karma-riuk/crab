@@ -121,6 +121,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         entry.metadata.reason_for_failure = "Couldn't get the build handler"
         entry.metadata.successful = False
         return
+    entry.metadata.build_system = build_handler.get_type()
     build_handler.set_client(docker_client)
         
     def _check_coverage(files: list[str]):

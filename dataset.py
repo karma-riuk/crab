@@ -13,6 +13,7 @@ class Metadata:
     pr_number: int
     merge_commit_sha: str # to checkout for the tests
     successful: bool = True
+    build_system: str = ""
     reason_for_failure: str = ""
     last_cmd_error_msg: str = ""
 
