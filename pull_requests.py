@@ -1,4 +1,4 @@
-import argparse, os, subprocess
+import argparse, os, subprocess, docker
 from typing import Optional
 from github.PullRequest import PullRequest
 from github.Repository import Repository
@@ -8,7 +8,8 @@ from tqdm import tqdm
 from datetime import datetime
 
 from dataset import Dataset, DatasetEntry, FileData, Metadata, Diff
-from utils import has_only_1_comment, move_github_logging_to_file
+from handlers import FailedToCompileError, FailedToTestError, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
+from utils import has_only_1_comment, move_github_logging_to_file, clone
 
 
 def get_good_projects(csv_file: str) -> pd.DataFrame:
@@ -72,15 +73,64 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     comment_text = comments[0].body if comments else ""
 
     diffs_after = [Diff(file.filename, file.patch) for file in repo.compare(first_commit.sha, last_commit.sha).files]
-
-
-    dataset.entries.append(DatasetEntry(
-        metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, True),
+    entry = DatasetEntry(
+        metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha),
         files=[FileData(file.filename) for file in pr.get_files()],
         diffs_before=diffs_before,
         comment=comment_text,
         diffs_after=diffs_after,
-    ))
+    )
+    dataset.entries.append(entry)
+
+    repo_path = os.path.join(repos_dir, repo.full_name)
+
+    updates = {}
+    if not clone(repo.full_name, repos_dir, updates):
+        entry.metadata.last_cmd_error_msg = updates["error_msg"]
+        entry.metadata.reason_for_failure = "Couldn't clone the repo successfully"
+        entry.metadata.successful = False
+
+    try:
+        subprocess.run(["git", "-C", repo_path, "checkout", pr.merge_commit_sha], check=True)
+    except subprocess.CalledProcessError as e:
+        entry.metadata.last_cmd_error_msg = e.stderr
+        entry.metadata.reason_for_failure = f"Couldn't checkout the commit '{pr.merge_commit_sha}'"
+        entry.metadata.successful = False
+        return
+
+    build_handler = get_build_handler(repos_dir, repo.full_name, updates)
+    if build_handler is None:
+        entry.metadata.last_cmd_error_msg = updates["error_msg"]
+        entry.metadata.reason_for_failure = "Couldn't get the build handler"
+        entry.metadata.successful = False
+        return
+        
+    steps = [
+        ("Checking for tests...", build_handler.check_for_tests),
+        ("Compiling...", build_handler.compile_repo),
+        ("Running tests...", build_handler.test_repo),
+    ]
+
+    error_map = {
+        NoTestsFoundError: "No tests found",
+        FailedToCompileError: "Failed to compile",
+        FailedToTestError: "Failed to test",
+        NoTestResultsToExtractError: "Failed to extract test results",
+    }
+
+    with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
+        try:
+            for message, action in steps:
+                pbar.set_postfix_str(message)
+                action()
+                pbar.update(1)
+        except tuple(error_map) as e:
+            entry.metadata.last_cmd_error_msg = str(e)
+            entry.metadata.reason_for_failure = error_map[type(e)]
+            entry.metadata.successful = False
+        finally:
+            build_handler.clean_repo()
+
 
 def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str):
     good_prs = []
@@ -135,11 +185,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
+    docker_client = docker.from_env()
     move_github_logging_to_file()
 
     dataset = Dataset()
     try:
         # try and finally to save, regardless of an error occuring or the program finished correctly
-        process_repos(args.csv_file, args.stats, args.repos, dataset)
+        process_repos(args.csv_file, args.stats, dataset, args.repos)
     finally:
         dataset.to_json(args.output)
