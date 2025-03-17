@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 import os, re, docker, signal, sys
 from bs4 import BeautifulSoup
-from typing import Optional
+from typing import Generator, Optional
+import xml.etree.ElementTree as ET
+
 
 USER_ID = os.getuid() # for container user
 GROUP_ID = os.getgid() 
@@ -104,22 +106,19 @@ class BuildHandler(ABC):
         if result.exit_code != 0:
             raise CantExecJacoco(clean_output(result.output))
 
-    def check_coverage(self, filename: str) -> None:
+    def check_coverage(self, filename: str) -> float:
         """
         Check if the given filename is covered by JaCoCo.
         """
-        coverage_report_path = self.get_jacoco_report_path()
-        if not os.path.exists(coverage_report_path):
-            raise NoCoverageReportFound(f"Coverage report file '{coverage_report_path}' does not exist")
+        for coverage_report_path in self.get_jacoco_report_paths():
+            if not os.path.exists(coverage_report_path):
+                raise NoCoverageReportFound(f"Coverage report file '{coverage_report_path}' does not exist")
 
-        with open(coverage_report_path, "r") as file:
-            soup = BeautifulSoup(file, "html.parser")
+            coverage = get_coverage_for_file(coverage_report_path, filename)
+            if coverage != -1:
+                return coverage
 
-        # Extract all files listed in the JaCoCo coverage report
-        covered_files = [a.text.strip() for a in soup.select("table tbody tr td a")]  
-        
-        if filename not in covered_files:
-            raise FileNotCovered(f"The file '{filename}' was not present in the report '{coverage_report_path}'")
+        raise FileNotCovered(f"File '{filename}' didn't have any coverage in any of the jacoco report.")
 
     def clean_repo(self) -> None:
         self.container.exec_run(self.clean_cmd())
@@ -296,6 +295,9 @@ class NoCoverageReportFound(Exception):
 class FileNotCovered(Exception):
     pass
 
+class GradleAggregateReportNotFound(Exception):
+    pass
+
 def merge_download_lines(lines: list) -> list:
     """
     Merges lines that are part of the same download block in Maven output.
@@ -349,6 +351,29 @@ def clean_output(output: bytes) -> str:
     cleaned_lines = merge_unapproved_licences(cleaned_lines)
 
     return "\n".join(cleaned_lines)
+
+def get_coverage_for_file(xml_file: str, target_filename: str) -> float:
+    # Parse the XML file
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+
+    # Find coverage for the target file
+    for package in root.findall(".//package"):
+        for sourcefile in package.findall("sourcefile"):
+            if sourcefile.get("name") == target_filename:
+                # Extract line coverage data
+                line_counter = sourcefile.find("counter[@type='LINE']")
+                if line_counter is not None:
+                    counter = line_counter.get("missed")
+                    assert isinstance(counter, str)
+                    missed = int(counter)
+                    counter = line_counter.get("covered")
+                    assert isinstance(counter, str)
+                    covered = int(counter)
+                    total = missed + covered
+                    coverage = (covered / total) * 100 if total > 0 else 0
+                    return coverage
+    return -1
 
 def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False) -> Optional[BuildHandler]:
     """
