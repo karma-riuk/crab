@@ -99,9 +99,30 @@ class BuildHandler(ABC):
         finally:
             signal.alarm(0)  # Cancel the alarm
 
+    def generate_coverage_report(self):
+        result = self.container.exec_run(self.generate_coverage_report_cmd())
+        if result.exit_code != 0:
+            raise CantExecJacoco(clean_output(result.output))
+
+    def check_coverage(self, filename: str) -> None:
+        """
+        Check if the given filename is covered by JaCoCo.
+        """
+        coverage_report_path = self.get_jacoco_report_path()
+        if not os.path.exists(coverage_report_path):
+            raise NoCoverageReportFound(f"Coverage report file '{coverage_report_path}' does not exist")
+
+        with open(coverage_report_path, "r") as file:
+            soup = BeautifulSoup(file, "html.parser")
+
+        # Extract all files listed in the JaCoCo coverage report
+        covered_files = [a.text.strip() for a in soup.select("table tbody tr td a")]  
+        
+        if filename not in covered_files:
+            raise FileNotCovered(f"The file '{filename}' was not present in the report '{coverage_report_path}'")
+
     def clean_repo(self) -> None:
         self.container.exec_run(self.clean_cmd())
-
 
     @abstractmethod
     def compile_cmd(self) -> str:
@@ -117,6 +138,14 @@ class BuildHandler(ABC):
 
     @abstractmethod
     def clean_cmd(self) -> str:
+        pass
+
+    @abstractmethod
+    def generate_coverage_report_cmd(self) -> str:
+        pass
+
+    @abstractmethod
+    def get_jacoco_report_path(self) -> str:
         pass
 
     @abstractmethod
@@ -140,6 +169,9 @@ class MavenHandler(BuildHandler):
     def clean_cmd(self) -> str:
         return f"{self.base_cmd} clean"
     
+    def generate_coverage_report_cmd(self):
+        return f"{self.base_cmd} jacoco:report"
+
     def container_name(self) -> str:
         return "crab-maven"
 
@@ -165,6 +197,9 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_skipped"] += skipped
             self.updates["n_tests_passed"] += (tests_run - (failures + errors))  # Calculate passed tests
 
+    def get_jacoco_report_path(self) -> str:
+        return os.path.join(self.path, "target/site/jacoco/index.html")
+
 class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
         super().__init__(repo_path, build_file, updates)
@@ -179,6 +214,9 @@ class GradleHandler(BuildHandler):
     def clean_cmd(self) -> str:
         return f"{self.base_cmd} clean"
     
+    def generate_coverage_report_cmd(self) -> str:
+        return f"{self.base_cmd}jacocoTestReport"
+
     def container_name(self) -> str:
         return "crab-gradle"
 
@@ -197,21 +235,25 @@ class GradleHandler(BuildHandler):
         with open(test_results_path, "r") as file:
             soup = BeautifulSoup(file, "html.parser")
         
-            test_div = soup.find("div", class_="infoBox", id="tests")
+            # test_div = soup.select_one("div", class_="infoBox", id="tests")
+            test_div = soup.select_one("div.infoBox#tests")
             if test_div is None:
                 raise NoTestResultsToExtractError("No test results found (no div.infoBox#tests)")
 
-            counter_div = test_div.find("div", class_="counter")
+            # counter_div = test_div.find("div", class_="counter")
+            counter_div = test_div.select_one("div.counter")
             if counter_div is None:
                 raise NoTestResultsToExtractError("No test results found (not div.counter for tests)")
 
             self.updates["n_tests"] = int(counter_div.text.strip())
             
-            failures_div = soup.find("div", class_="infoBox", id="failures")
+            # failures_div = soup.find("div", class_="infoBox", id="failures")
+            failures_div = soup.select_one("div.infoBox#failures")
             if failures_div is None:
                 raise NoTestResultsToExtractError("No test results found (no div.infoBox#failures)")
 
-            counter_div = failures_div.find("div", class_="counter")
+            # counter_div = failures_div.find("div", class_="counter")
+            counter_div = failures_div.select_one("div.counter")
             if counter_div is None:
                 raise NoTestResultsToExtractError("No test results found (not div.counter for failures)")
 
@@ -219,6 +261,9 @@ class GradleHandler(BuildHandler):
             
             # Calculate passed tests
             self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
+
+    def get_jacoco_report_path(self) -> str:
+        return os.path.join(self.path, "build/reports/jacoco/test/html/index.html")
 
 class NoTestsFoundError(Exception):
     pass
@@ -230,6 +275,15 @@ class FailedToTestError(Exception):
     pass
 
 class NoTestResultsToExtractError(Exception):
+    pass
+
+class CantExecJacoco(Exception):
+    pass
+
+class NoCoverageReportFound(Exception):
+    pass
+
+class FileNotCovered(Exception):
     pass
 
 def merge_download_lines(lines: list) -> list:

@@ -8,7 +8,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from dataset import Dataset, DatasetEntry, FileData, Metadata, Diff
-from handlers import FailedToCompileError, FailedToTestError, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
+from handlers import CantExecJacoco, FailedToCompileError, FailedToTestError, FileNotCovered, NoCoverageReportFound, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone
 
 
@@ -123,10 +123,16 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         return
     build_handler.set_client(docker_client)
         
+    def _check_coverage(files: list[str]):
+        for file in files:
+            build_handler.check_coverage(file)
+        
     steps = [
         ("Checking for tests...", build_handler.check_for_tests),
         ("Compiling...", build_handler.compile_repo),
         ("Running tests...", build_handler.test_repo),
+        ("Generating coverage...", build_handler.generate_coverage_report),
+        ("Checking coverage...", lambda: _check_coverage([file.filename for file in pr.get_files()])),
     ]
 
     error_map = {
@@ -134,6 +140,9 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         FailedToCompileError: "Failed to compile",
         FailedToTestError: "Failed to test",
         NoTestResultsToExtractError: "Failed to extract test results",
+        CantExecJacoco: "Coudln't execute jacoco",
+        NoCoverageReportFound: "No coverage report was found",
+        FileNotCovered: "A file from the PR was not coverege",
     }
 
     with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
