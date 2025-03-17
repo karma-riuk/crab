@@ -149,7 +149,7 @@ class BuildHandler(ABC):
         pass
 
     @abstractmethod
-    def get_jacoco_report_path(self) -> str:
+    def get_jacoco_report_paths(self) -> Generator[str]:
         pass
 
     @abstractmethod
@@ -204,8 +204,8 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_skipped"] += skipped
             self.updates["n_tests_passed"] += (tests_run - (failures + errors))  # Calculate passed tests
 
-    def get_jacoco_report_path(self) -> str:
-        return os.path.join(self.path, "target/site/jacoco/index.html")
+    def get_jacoco_report_paths(self) -> Generator[str]:
+        yield os.path.join(self.path, "target/site/jacoco-aggregate/jacoco.xml")
 
 class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
@@ -272,8 +272,8 @@ class GradleHandler(BuildHandler):
             # Calculate passed tests
             self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
 
-    def get_jacoco_report_path(self) -> str:
         return os.path.join(self.path, "build/reports/jacoco/test/html/index.html")
+    def get_jacoco_report_paths(self) -> Generator[str]:
 
 class NoTestsFoundError(Exception):
     pass
