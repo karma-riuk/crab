@@ -171,7 +171,7 @@ def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset, rep
             pbar.set_postfix({
                 "repo": repo_name, 
                 "started at": datetime.now().strftime("%d/%m, %H:%M:%S"),
-                "# triplets": f"{len(dataset)}/{len(dataset.entries)} ({len(dataset)/len(dataset.entries):.2%})"
+                "# triplets": f"{len(dataset)}/{len(dataset.entries)} ({len(dataset)/len(dataset.entries) if len(dataset.entries) > 0 else 0:.2%})"
             })
             if repo_name in already_processed_repos and repo_name not in potentially_good_repos:
                 pbar.update(1)
