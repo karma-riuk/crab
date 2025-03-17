@@ -41,20 +41,3 @@ class Dataset:
         """Serialize the dataset to a JSON file"""
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(self, f, default=lambda o: o.__dict__, indent=4)
-
-    @staticmethod
-    def from_json(filename: str):
-        """Load the dataset from a JSON file"""
-        with open(filename, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return Dataset(
-                entries=[
-                    DatasetEntry(
-                        metadata=Metadata(**entry["metadata"]),
-                        files=[FileData(**file) for file in entry["files"]],
-                        diffs_before=entry["diffs_before"],
-                        comment=entry["comment"],
-                        diffs_after=entry["diffs_after"]
-                    ) for entry in data["entries"]
-                ]
-            )
