@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 import json
 
 @dataclass
@@ -25,10 +25,10 @@ class Diff:
 @dataclass
 class DatasetEntry:
     metadata: Metadata
-    files: List[FileData] # files before the PR (before the first PR commits)
-    diffs_before: List[Diff] # diffs between the opening of the PR and the comment
+    files: Dict[str, FileData] # filename -> file data, files before the PR (before the first PR commits)
+    diffs_before: Dict[str, Diff] # filename -> diff, diffs between the opening of the PR and the comment
     comment: str
-    diffs_after: List[Diff] # changes after the comment
+    diffs_after: Dict[str, Diff] # filename -> diff, changes after the comment
 
 @dataclass
 class Dataset:
