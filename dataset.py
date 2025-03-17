@@ -5,6 +5,7 @@ import json
 @dataclass
 class FileData:
     path: str
+    coverage: float = -1 # coverage of the file, default -1, is different if we get to the jacoco part of the pipeline
     content: str = "" # Not sure about this, maybe we should just keep the path and extract the contents dynamically (boh)
 
 @dataclass
