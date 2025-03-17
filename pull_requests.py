@@ -149,7 +149,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
         try:
             for message, action in steps:
-                pbar.set_postfix_str(message)
+                pbar.set_postfix({"doing": message, "started at": datetime.now().strftime("%d/%m, %H:%M:%S")})
                 action()
                 pbar.update(1)
         except tuple(error_map) as e:
