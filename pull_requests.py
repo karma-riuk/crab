@@ -107,6 +107,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         entry.metadata.reason_for_failure = "Couldn't get the build handler"
         entry.metadata.successful = False
         return
+    build_handler.set_client(docker_client)
         
     steps = [
         ("Checking for tests...", build_handler.check_for_tests),
