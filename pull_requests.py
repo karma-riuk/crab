@@ -141,9 +141,9 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         FailedToCompileError: "Failed to compile",
         FailedToTestError: "Failed to test",
         NoTestResultsToExtractError: "Failed to extract test results",
-        CantExecJacoco: "Coudln't execute jacoco",
+        CantExecJacoco: "Couldn't execute jacoco",
         NoCoverageReportFound: "No coverage report was found",
-        FileNotCovered: "A file from the PR was not coverege",
+        FileNotCovered: "Files from the PR were not covered",
     }
 
     with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
