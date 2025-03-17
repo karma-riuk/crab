@@ -27,7 +27,10 @@ def get_good_projects(csv_file: str) -> pd.DataFrame:
     return df.loc[(df['good_repo_for_crab'] == True) & (df['n_tests'] > 0)]
 
 def is_pull_good(pull: PullRequest, verbose: bool = False):
-    return has_only_1_comment(pull.get_commits(), pull.get_review_comments(), verbose=verbose)
+    return (
+        has_only_1_comment(pull.get_commits(), pull.get_review_comments(), verbose=verbose)
+        and pull.user.type != "Bot"
+    )
 
 def get_good_prs(repo: Repository, stats_df: Optional[pd.DataFrame]) -> list[PullRequest]:
     good_prs = []
