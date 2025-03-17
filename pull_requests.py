@@ -134,6 +134,8 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         finally:
             build_handler.clean_repo()
 
+    dataset.to_json(args.output)
+
 
 def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str):
     good_prs = []
