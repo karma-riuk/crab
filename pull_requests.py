@@ -7,7 +7,7 @@ from github import Github
 from tqdm import tqdm
 from datetime import datetime
 
-from dataset import Dataset, DatasetEntry, FileData, Metadata, Diff
+from dataset import Dataset, DatasetEntry, FileData, Metadata
 from handlers import CantExecJacoco, FailedToCompileError, FailedToTestError, FileNotCovered, GradleAggregateReportNotFound, NoCoverageReportFound, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone
 
