@@ -1,5 +1,5 @@
 import argparse, os, subprocess, docker
-from typing import Optional
+from typing import Any, Callable, Optional
 from github.PullRequest import PullRequest
 from github.Repository import Repository
 import pandas as pd
@@ -106,14 +106,31 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         entry.metadata.reason_for_failure = "Couldn't clone the repo successfully"
         entry.metadata.successful = False
 
-    try:
-        ensure_full_history(repo_path)
-        run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
-    except subprocess.CalledProcessError as e:
-        entry.metadata.last_cmd_error_msg = f"{e.stderr}"
-        entry.metadata.reason_for_failure = f"Couldn't checkout the commit"
-        entry.metadata.successful = False
+    def _try_cmd(action: Callable[[], Any], reason_for_failure: str) -> bool:
+        """
+        Tries a command, and if it fails, it sets the metadata of the entry.
+        """
+        try:
+            # return action()
+            action()
+        except subprocess.CalledProcessError as e:
+            entry.metadata.last_cmd_error_msg = f"{e.stderr}"
+            entry.metadata.reason_for_failure = reason_for_failure
+            entry.metadata.successful = False
+            # raise e
+        return entry.metadata.successful
+
+    if not _try_cmd(lambda: ensure_full_history(repo_path), "Couldn't ensure the full history of the repo (fetch --unshallow)"):
         return
+
+    try:
+        run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
+    except subprocess.CalledProcessError:
+        if not _try_cmd(lambda: run_git_cmd(["fetch", "origin", f"pull/{pr.number}/merge"], repo_path), "Couldn't fetch the PR's merge commit"):
+            return
+        
+        if not _try_cmd(lambda: run_git_cmd(["checkout", pr.merge_commit_sha], repo_path), "Coudln't checkout the PR's merge commit (even after fetching the pull/<pr_number>/merge)"):
+            return
 
     build_handler = get_build_handler(repos_dir, repo.full_name, updates)
     if build_handler is None:
