@@ -8,7 +8,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from dataset import Dataset, DatasetEntry, FileData, Metadata
-from handlers import CantExecJacoco, FailedToCompileError, FailedToTestError, FileNotCovered, GradleAggregateReportNotFound, NoCoverageReportFound, NoTestsFoundError, NoTestResultsToExtractError, get_build_handler
+from handlers import FileNotCovered, HandlerException, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone
 
 
@@ -154,26 +154,15 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         ("Checking coverage...", lambda: _check_coverage([file.filename for file in pr.get_files()])),
     ]
 
-    error_map = {
-        NoTestsFoundError: "No tests found",
-        FailedToCompileError: "Failed to compile",
-        FailedToTestError: "Failed to test",
-        NoTestResultsToExtractError: "Failed to extract test results",
-        CantExecJacoco: "Couldn't execute jacoco",
-        NoCoverageReportFound: "No coverage report was found",
-        FileNotCovered: "Files from the PR were not covered",
-        GradleAggregateReportNotFound: "Couldn't find the aggregate report (with gradle it's messy)",
-    }
-
     with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
         try:
             for message, action in steps:
                 pbar.set_postfix({"doing": message, "started at": datetime.now().strftime("%d/%m, %H:%M:%S")})
                 action()
                 pbar.update(1)
-        except tuple(error_map) as e:
+        except HandlerException as e:
             entry.metadata.last_cmd_error_msg = str(e)
-            entry.metadata.reason_for_failure = error_map[type(e)]
+            entry.metadata.reason_for_failure = e.reason_for_failure
             entry.metadata.successful = False
         finally:
             build_handler.clean_repo()

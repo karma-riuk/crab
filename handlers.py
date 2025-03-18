@@ -274,29 +274,32 @@ class GradleHandler(BuildHandler):
     def get_jacoco_report_paths(self) -> Iterable[str]:
         raise GradleAggregateReportNotFound("Gradle does not generate a single coverage report file")
 
-class NoTestsFoundError(Exception):
-    pass
+class HandlerException(Exception):
+    reason_for_failure = "Generic handler expection (this shouldn't appear)"
 
-class FailedToCompileError(Exception):
-    pass
+class NoTestsFoundError(HandlerException):
+    reason_for_failure = "No tests found"
 
-class FailedToTestError(Exception):
-    pass
+class FailedToCompileError(HandlerException):
+    reason_for_failure = "Failed to compile"
 
-class NoTestResultsToExtractError(Exception):
-    pass
+class FailedToTestError(HandlerException):
+    reason_for_failure = "Failed to test"
 
-class CantExecJacoco(Exception):
-    pass
+class NoTestResultsToExtractError(HandlerException):
+    reason_for_failure = "Failed to extract test results"
 
-class NoCoverageReportFound(Exception):
-    pass
+class CantExecJacoco(HandlerException):
+    reason_for_failure = "Couldn't execute jacoco"
 
-class FileNotCovered(Exception):
-    pass
+class NoCoverageReportFound(HandlerException):
+    reason_for_failure = "No coverage report was found"
 
-class GradleAggregateReportNotFound(Exception):
-    pass
+class FileNotCovered(HandlerException):
+    reason_for_failure = "Files from the PR were not covered"
+
+class GradleAggregateReportNotFound(HandlerException):
+    reason_for_failure = "Couldn't find the aggregate report (with gradle it's messy)"
 
 def merge_download_lines(lines: list) -> list:
     """
