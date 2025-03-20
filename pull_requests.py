@@ -180,7 +180,7 @@ def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Data
             pbar.set_postfix({"pr": pr.number})
             process_pull(repo, pr, dataset, repos_dir)
 
-def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset, repos_dir: str):
+def process_repos(df: pd.DataFrame, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str):
     """
     Processes the repos in the given csv file, extracting the good ones and
     creating the "triplets" for the dataset.
@@ -191,8 +191,6 @@ def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset, rep
         Passing it by reference in order have the latest information, in case of an error
     verbose (bool): Whether to be verbose or not
     """
-    df = get_good_projects(csv_file)
-    stats_df = pd.read_csv(stats_csv) if stats_csv is not None else None
     already_processed_repos = []
     potentially_good_repos = []
     if stats_df is not None:
@@ -222,15 +220,22 @@ if __name__ == "__main__":
     parser.add_argument('-r', '--repos', type=str, default="./results/", help='The directory in which the repos were cloned (will be cloned if they aren\'t there already). Default: "./results/"')
     parser.add_argument('-s', '--stats', type=str, help="The name of the output file from the stats_pull_requests.py. The stats file already knows which PRs are good (the ones with only 1 comment between two rounds of commits), so instead of going through all of PRs of a repo, we can fast-track using this. If the repo isn't in the stats file, we must go through each PR")
     # parser.add_argument('-v', '--verbose', action='store_true', help='Prints the number of good projects.')
+    parser.add_argument("--only-repo", type=str, help="If this argument is not provided, all the repos in the '--repos' csv will be processed. If instead you want to run the script on a single repo (for testing purposes mainly) provide a string of form 'XXX/YYY' to this argument, where XXX is the owner of the repo and YYY is the name of the repo")
 
     args = parser.parse_args()
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
     docker_client = docker.from_env()
     move_github_logging_to_file()
 
+    df = get_good_projects(args.csv_file)
+
+    if args.only_repo is not None:
+        df = df.loc[df["name"] == args.only_repo]
+
+    stats_df = pd.read_csv(args.stats) if args.stats is not None else None
     dataset = Dataset()
     try:
         # try and finally to save, regardless of an error occuring or the program finished correctly
-        process_repos(args.csv_file, args.stats, dataset, args.repos)
+        process_repos(df, stats_df, dataset, args.repos)
     finally:
         dataset.to_json(args.output)
