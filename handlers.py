@@ -299,7 +299,7 @@ class NoCoverageReportFound(HandlerException):
     reason_for_failure = "No coverage report was found"
 
 class FileNotCovered(HandlerException):
-    reason_for_failure = "Files from the PR were not covered"
+    reason_for_failure = "Commented file from the PR wasn't not covered"
 
 class GradleAggregateReportNotFound(HandlerException):
     reason_for_failure = "Couldn't find the aggregate report (with gradle it's messy)"
