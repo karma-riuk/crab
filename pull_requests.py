@@ -193,8 +193,10 @@ def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Data
     repo = g.get_repo(repo_name)
     good_prs = get_good_prs(repo, stats_df)
 
-    for pr in tqdm(good_prs, desc="Processing good prs", leave=False):
-        process_pull(repo, pr, dataset, repos_dir)
+    with tqdm(good_prs, desc="Processing good prs", leave=False) as pbar:
+        for pr in pbar:
+            pbar.set_postfix({"pr": pr.number})
+            process_pull(repo, pr, dataset, repos_dir)
 
 def process_repos(csv_file: str, stats_csv: Optional[str], dataset: Dataset, repos_dir: str):
     """
