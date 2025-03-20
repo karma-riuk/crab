@@ -5,7 +5,6 @@ import json
 @dataclass
 class FileData:
     path: str
-    coverage: float = -1 # coverage of the file, default -1, is different if we get to the jacoco part of the pipeline
     content: str = "" # Not sure about this, maybe we should just keep the path and extract the contents dynamically (boh)
 
 @dataclass
@@ -13,7 +12,8 @@ class Metadata:
     repo: str # the name of the repo, with style XXX/YYY 
     pr_number: int
     merge_commit_sha: str # to checkout for the tests
-    comment_path : str
+    commented_file : str
+    commented_file_coverage: float = 0
     successful: bool = True
     build_system: str = ""
     reason_for_failure: str = ""
