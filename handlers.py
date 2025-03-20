@@ -277,7 +277,7 @@ class GradleHandler(BuildHandler):
     def get_jacoco_report_paths(self) -> Iterable[str]:
         raise GradleAggregateReportNotFound("Gradle does not generate a single coverage report file")
 
-class HandlerException(Exception):
+class HandlerException(Exception, ABC):
     reason_for_failure = "Generic handler expection (this shouldn't appear)"
 
 class NoTestsFoundError(HandlerException):
