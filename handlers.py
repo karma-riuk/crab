@@ -205,10 +205,17 @@ class MavenHandler(BuildHandler):
 
     def get_jacoco_report_paths(self) -> Iterable[str]:
         # yield os.path.join(self.path, "target/site/jacoco-aggregate/jacoco.xml")
-        for root, _, files in os.walk(os.path.join(self.path, "target", "site")):
+        found_at_least_one = False
+        for root, _, files in os.walk(os.path.join(self.path)):
+            if "target/site" not in root:
+                continue # to avoid any misleading jacoco.xml randomly lying around
             for file in files:
                 if file == "jacoco.xml":
+                    found_at_least_one = True
                     yield os.path.join(root, file)
+        if not found_at_least_one:
+            raise NoCoverageReportFound(f"Couldn't find any 'jacoco.xml' in {self.path}")
+
 class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
         super().__init__(repo_path, build_file, updates)
