@@ -13,6 +13,7 @@ class Metadata:
     repo: str # the name of the repo, with style XXX/YYY 
     pr_number: int
     merge_commit_sha: str # to checkout for the tests
+    comment_path : str
     successful: bool = True
     build_system: str = ""
     reason_for_failure: str = ""
