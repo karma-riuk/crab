@@ -282,7 +282,16 @@ class GradleHandler(BuildHandler):
             self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
 
     def get_jacoco_report_paths(self) -> Iterable[str]:
-        raise GradleAggregateReportNotFound("Gradle does not generate a single coverage report file")
+        found_at_least_one = False
+        for root, _, files in os.walk(os.path.join(self.path)):
+            if "reports/jacoco" not in root:
+                continue
+            for file in files:
+                if file == "index.html":
+                    found_at_least_one = True
+                    yield os.path.join(root, file)
+        if not found_at_least_one:
+            raise NoCoverageReportFound(f"Couldn't find any 'index.html' inside any 'reports/jacoco' in {self.path}")
 
 class HandlerException(Exception, ABC):
     reason_for_failure = "Generic handler expection (this shouldn't appear)"
