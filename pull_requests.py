@@ -8,7 +8,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from dataset import Dataset, DatasetEntry, FileData, Metadata
-from handlers import FileNotCovered, HandlerException, get_build_handler
+from handlers import HandlerException, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone
 
 
