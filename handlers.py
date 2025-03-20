@@ -176,7 +176,7 @@ class MavenHandler(BuildHandler):
         return f"{self.base_cmd} clean"
     
     def generate_coverage_report_cmd(self):
-        return f"{self.base_cmd} jacoco:report-aggregate"
+        return f"{self.base_cmd} jacoco:report"
 
     def container_name(self) -> str:
         return "crab-maven"
