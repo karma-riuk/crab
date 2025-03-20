@@ -86,11 +86,13 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
 
     comments = list(pr.get_review_comments())
     assert len(comments) == 1
-    comment_text = comments[0].body if comments else ""
+    comment = comments[0]
+    comment_text = comment.body
+    commented_file_path = comment.path
 
     diffs_after = {file.filename: file.patch for file in repo.compare(first_commit.sha, last_commit.sha).files}
     entry = DatasetEntry(
-        metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha),
+        metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, commented_file_path),
         files={file.filename: FileData(file.filename) for file in pr.get_files()},
         diffs_before=diffs_before,
         comment=comment_text,
@@ -141,34 +143,12 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     entry.metadata.build_system = build_handler.get_type()
     build_handler.set_client(docker_client)
         
-    def _check_coverage(filenames: list[str]):
-        should_throw = True
-        error = None
-        for filename in filenames:
-            try:
-                # first run the coverage over all the files, and then throw if
-                # it's necessary I wouldn't want to throw away this entry if
-                # one of the files inside the PR is a README (which is by
-                # default not covered by any tests). I want to consider it
-                # successful if at least one of the files is covered. Then I
-                # want to exclude manually if it isn't good
-
-                entry.files[filename].coverage = build_handler.check_coverage(filename)
-                # if we didn't throw, it means that the file was covered
-                should_throw = False
-            except FileNotCovered as e:
-                error = e
-
-        if should_throw and error is not None:
-            raise error
-
-        
     steps = [
         ("Checking for tests...", build_handler.check_for_tests),
         ("Compiling...", build_handler.compile_repo),
         ("Running tests...", build_handler.test_repo),
         ("Generating coverage...", build_handler.generate_coverage_report),
-        ("Checking coverage...", lambda: _check_coverage([file.filename for file in pr.get_files()])),
+        ("Checking coverage...", lambda: build_handler.check_coverage(commented_file_path)),
     ]
 
     with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
