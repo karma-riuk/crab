@@ -92,7 +92,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
 
     diffs_after = {file.filename: file.patch for file in repo.compare(first_commit.sha, last_commit.sha).files}
     entry = DatasetEntry(
-        metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, commented_file_path, reason_for_failure="Was still processing while the program crashed / was stopped"),
+        metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, commented_file_path, reason_for_failure="Was still being processed"),
         files={file.filename: FileData(file.filename) for file in pr.get_files()},
         diffs_before=diffs_before,
         comment=comment_text,
