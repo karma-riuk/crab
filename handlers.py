@@ -204,8 +204,11 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_passed"] += (tests_run - (failures + errors))  # Calculate passed tests
 
     def get_jacoco_report_paths(self) -> Iterable[str]:
-        yield os.path.join(self.path, "target/site/jacoco-aggregate/jacoco.xml")
-
+        # yield os.path.join(self.path, "target/site/jacoco-aggregate/jacoco.xml")
+        for root, _, files in os.walk(os.path.join(self.path, "target", "site")):
+            for file in files:
+                if file == "jacoco.xml":
+                    yield os.path.join(root, file)
 class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
         super().__init__(repo_path, build_file, updates)
