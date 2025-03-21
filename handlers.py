@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
-import os, re, docker, signal, sys
+import os, re, docker, signal, sys, javalang
 from bs4 import BeautifulSoup
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple, Iterator
 import xml.etree.ElementTree as ET
+from javalang.tree import PackageDeclaration
+
+REPORT_SIZE_THRESHOLD = 400 # less than 400 bytes (charcaters), we don't care about it
 
 
 USER_ID = os.getuid() # for container user
@@ -106,19 +109,51 @@ class BuildHandler(ABC):
         if result.exit_code != 0:
             raise CantExecJacoco(clean_output(result.output))
 
-    def check_coverage(self, filename: str) -> float:
+    def check_coverage(self, filename: str) -> Iterator[Tuple[str, float]]:
         """
         Check if the given filename is covered by JaCoCo.
         """
+        found_at_least_one = False
+        candidates = []
         for coverage_report_path in self.get_jacoco_report_paths():
             if not os.path.exists(coverage_report_path):
                 raise NoCoverageReportFound(f"Coverage report file '{coverage_report_path}' does not exist")
 
-            coverage = get_coverage_for_file(coverage_report_path, filename)
+            fully_qualified_class = self._extract_fully_qualified_class(filename)
+            candidates.append({"report_file": coverage_report_path, "fqc": fully_qualified_class})
+            # if coverage_report_path[:len(src_dir)] != src_dir:
+            #     continue
+            coverage = get_coverage_for_file(coverage_report_path, fully_qualified_class, os.path.basename(filename))
             if coverage != -1:
-                return coverage
+                found_at_least_one = True
+                yield coverage_report_path, coverage
 
-        raise FileNotCovered(f"File '{filename}' didn't have any coverage in any of the jacoco report.")
+        if not found_at_least_one:
+            raise FileNotCovered(f"File '{filename}' didn't have any coverage in any of the jacoco reports: {candidates}")
+
+    def _extract_fully_qualified_class(self, filepath: str) -> str:
+        if not filepath.endswith('.java'):
+            raise NotJavaFileError(f"File '{filepath}' does not end with .java")
+
+        with open(os.path.join(self.path, filepath)) as f:
+            try:
+                parsed_tree = javalang.parse.parse(f.read())
+            except javalang.parser.JavaSyntaxError as e:
+                raise NotJavaFileError(f"File '{filepath}' has a syntax error and could not be parsed by javalang, raised error: '{e}'")
+
+            package_name = None
+            for _, node in parsed_tree.filter(PackageDeclaration):
+                package_name = node.name # type: ignore
+                break  # Stop after finding the first package declaration
+
+            if package_name is None:
+                raise NoPackageFoundError(f"File '{filepath}' did not have a packaged name recognized by javalang")
+
+            fully_qualified_class = package_name.replace('.', '/')
+            # src_dir = filepath[:filepath.index(fully_qualified_class)]
+            fully_qualified_class += "/" + os.path.basename(filepath)[:-5] # -5 to remove '.java'
+            return fully_qualified_class
+
 
     def clean_repo(self) -> None:
         self.container.exec_run(self.clean_cmd())
@@ -319,6 +354,12 @@ class FileNotCovered(HandlerException):
 class GradleAggregateReportNotFound(HandlerException):
     reason_for_failure = "Couldn't find the aggregate report (with gradle it's messy)"
 
+class NotJavaFileError(HandlerException):
+    reason_for_failure = "File that was checked for coverage was not java file"
+
+class NoPackageFoundError(HandlerException):
+    reason_for_failure = "Java file did not contain a valid package name"
+
 def merge_download_lines(lines: list) -> list:
     """
     Merges lines that are part of the same download block in Maven output.
@@ -373,17 +414,17 @@ def clean_output(output: bytes) -> str:
 
     return "\n".join(cleaned_lines)
 
-def get_coverage_for_file(xml_file: str, target_filename: str) -> float:
+def get_coverage_for_file(xml_file: str, target_fully_qualified_class: str, basename: str) -> float:
     # Parse the XML file
     tree = ET.parse(xml_file)
     root = tree.getroot()
 
     # Find coverage for the target file
     for package in root.findall(".//package"):
-        for sourcefile in package.findall("sourcefile"):
-            if sourcefile.get("name") == target_filename:
+        for class_ in package.findall("class"):
+            if class_.get("sourcefilename") == basename and class_.get("name") == target_fully_qualified_class:
                 # Extract line coverage data
-                line_counter = sourcefile.find("counter[@type='LINE']")
+                line_counter = class_.find("counter[@type='LINE']")
                 if line_counter is not None:
                     counter = line_counter.get("missed")
                     assert isinstance(counter, str)
