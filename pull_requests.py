@@ -143,12 +143,16 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     entry.metadata.build_system = build_handler.get_type()
     build_handler.set_client(docker_client)
         
+    def _check_coverages():
+        for coverage_file, coverage in build_handler.check_coverage(commented_file_path):
+            entry.metadata.commented_file_coverages[coverage_file] = coverage
+
     steps = [
         ("Checking for tests...", build_handler.check_for_tests),
         ("Compiling...", build_handler.compile_repo),
         ("Running tests...", build_handler.test_repo),
         ("Generating coverage...", build_handler.generate_coverage_report),
-        ("Checking coverage...", lambda: build_handler.check_coverage(commented_file_path)),
+        ("Checking coverage...", _check_coverages),
     ]
 
     with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
