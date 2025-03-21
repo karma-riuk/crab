@@ -204,7 +204,6 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_passed"] += (tests_run - (failures + errors))  # Calculate passed tests
 
     def get_jacoco_report_paths(self) -> Iterable[str]:
-        # yield os.path.join(self.path, "target/site/jacoco-aggregate/jacoco.xml")
         found_at_least_one = False
         for root, _, files in os.walk(os.path.join(self.path)):
             if "target/site" not in root:
