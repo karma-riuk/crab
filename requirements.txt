@@ -4,3 +4,4 @@ docker
 beautifulsoup4
 unidiff
 PyGithub
+javalang
