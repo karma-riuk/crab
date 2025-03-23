@@ -1,3 +1,4 @@
+from collections import defaultdict
 import argparse, os, subprocess, docker
 from typing import Any, Callable, Optional
 from github.PullRequest import PullRequest
@@ -74,7 +75,11 @@ def reset_repo_to_latest_commit(repo_path: str) -> None:
     current_branch = run_git_cmd(["rev-parse", "--abbrev-ref", "HEAD"], repo_path).stdout.strip()
     run_git_cmd(["reset", "--hard", current_branch], repo_path)
 
-def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir: str):
+def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir: str, cache: dict[str, dict[int, DatasetEntry]] = {}):
+    if pr.number in cache.get(repo.full_name, set()):
+        dataset.entries.append(cache[repo.full_name][pr.number])
+        return
+
     commits = list(pr.get_commits())
     if not commits:
         return  # No commits, skip processing
@@ -181,7 +186,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     dataset.to_json(args.output)
 
 
-def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str):
+def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str, cache: dict[str, dict[int, DatasetEntry]] = {}):
     good_prs = []
     repo = g.get_repo(repo_name)
     good_prs = get_good_prs(repo, stats_df)
@@ -189,9 +194,9 @@ def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Data
     with tqdm(good_prs, desc="Processing good prs", leave=False) as pbar:
         for pr in pbar:
             pbar.set_postfix({"pr": pr.number})
-            process_pull(repo, pr, dataset, repos_dir)
+            process_pull(repo, pr, dataset, repos_dir, cache)
 
-def process_repos(df: pd.DataFrame, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str):
+def process_repos(df: pd.DataFrame, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str, cache: dict[str, dict[int, DatasetEntry]] = {}):
     """
     Processes the repos in the given csv file, extracting the good ones and
     creating the "triplets" for the dataset.
@@ -220,7 +225,7 @@ def process_repos(df: pd.DataFrame, stats_df: Optional[pd.DataFrame], dataset: D
             if repo_name in already_processed_repos and repo_name not in potentially_good_repos:
                 pbar.update(1)
                 continue # skipping because we know there's nothing good already
-            process_repo(repo_name, stats_df, dataset, repos_dir)
+            process_repo(repo_name, stats_df, dataset, repos_dir, cache)
             pbar.update(1)
 
 
@@ -230,6 +235,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', '--output', type=str, default="./dataset.json", help='The file in which the dataset will be contained. Default is "./dataset.json"')
     parser.add_argument('-r', '--repos', type=str, default="./results/", help='The directory in which the repos were cloned (will be cloned if they aren\'t there already). Default: "./results/"')
     parser.add_argument('-s', '--stats', type=str, help="The name of the output file from the stats_pull_requests.py. The stats file already knows which PRs are good (the ones with only 1 comment between two rounds of commits), so instead of going through all of PRs of a repo, we can fast-track using this. If the repo isn't in the stats file, we must go through each PR")
+    parser.add_argument('-c', '--cache', type=str, help="The name of the output file from another run of this script. This is for when the script unexpectedly got interrupted and you want to resume from where you left off.")
     # parser.add_argument('-v', '--verbose', action='store_true', help='Prints the number of good projects.')
     parser.add_argument("--only-repo", type=str, help="If this argument is not provided, all the repos in the '--repos' csv will be processed. If instead you want to run the script on a single repo (for testing purposes mainly) provide a string of form 'XXX/YYY' to this argument, where XXX is the owner of the repo and YYY is the name of the repo")
 
@@ -242,6 +248,13 @@ if __name__ == "__main__":
 
     if args.only_repo is not None:
         df = df.loc[df["name"] == args.only_repo]
+
+    cache: dict[str, dict[int, DatasetEntry]] = defaultdict(dict)
+    if args.cache is not None:
+        cache_dataset = Dataset.from_json(args.cache)
+        for cache_entry in cache_dataset.entries:
+            cache[cache_entry.metadata.repo][cache_entry.metadata.pr_number] = cache_entry
+        
 
     stats_df = pd.read_csv(args.stats) if args.stats is not None else None
     dataset = Dataset()
