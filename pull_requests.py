@@ -33,7 +33,7 @@ def is_pull_good(pull: PullRequest, verbose: bool = False):
         and pull.user.type != "Bot"
     )
 
-def get_good_prs(repo: Repository, stats_df: Optional[pd.DataFrame]) -> list[PullRequest]:
+def get_good_prs(repo: Repository, stats_df: Optional[pd.DataFrame], cache: dict[str, dict[int, DatasetEntry]] = {}) -> list[PullRequest]:
     good_prs = []
     prs = repo.get_pulls(state="closed")
 
@@ -43,7 +43,9 @@ def get_good_prs(repo: Repository, stats_df: Optional[pd.DataFrame]) -> list[Pul
         from_stats = False
     else:
         potenially_good_prs_numbers = stats_df.loc[(stats_df["repo"] == repo.full_name) & (stats_df["has_only_1_comment"] == True)]["pr_number"]
-        potenially_good_prs = [repo.get_pull(n) for n in potenially_good_prs_numbers]
+        if repo.full_name in cache:
+            potenially_good_prs_numbers = [n for n in potenially_good_prs_numbers if n not in cache[repo.full_name]]
+        potenially_good_prs = [repo.get_pull(n) for n in tqdm(potenially_good_prs_numbers, desc=f"Getting good PRs from stats", leave=False)]
         number_of_prs = len(potenially_good_prs)
         from_stats = True
 
@@ -187,15 +189,15 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
 
 
 def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Dataset, repos_dir: str, cache: dict[str, dict[int, DatasetEntry]] = {}):
-    good_prs = []
     repo = g.get_repo(repo_name)
-    good_prs = get_good_prs(repo, stats_df)
-
-    if repo_name in cache:
-        for pr_number in tqdm(cache[repo_name], desc="Copying cached entries", leave=False):
-            dataset.entries.append(cache[repo_name][pr_number])
+    if repo.full_name in cache:
+        dataset.entries.extend(cache[repo.full_name].values())
         dataset.to_json(args.output)
 
+    good_prs = []
+    good_prs = get_good_prs(repo, stats_df, cache)
+
+    if repo_name in cache:
         good_prs = [pr for pr in good_prs if pr.number not in cache[repo_name]]
 
     with tqdm(good_prs, desc="Processing good prs", leave=False) as pbar:
