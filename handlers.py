@@ -135,6 +135,9 @@ class BuildHandler(ABC):
         if not filepath.endswith('.java'):
             raise NotJavaFileError(f"File '{filepath}' does not end with .java")
 
+        if not os.path.exists(os.path.join(self.path, filepath)):
+            raise FileNotFoundInRepoError(f"File '{filepath}' not found in repo")
+
         with open(os.path.join(self.path, filepath)) as f:
             try:
                 parsed_tree = javalang.parse.parse(f.read())
@@ -359,6 +362,9 @@ class NotJavaFileError(HandlerException):
 
 class NoPackageFoundError(HandlerException):
     reason_for_failure = "Java file did not contain a valid package name"
+
+class FileNotFoundInRepoError(HandlerException):
+    reason_for_failure = "Commented file not found in repo (likely renamed or deleted)"
 
 def merge_download_lines(lines: list) -> list:
     """
