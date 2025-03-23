@@ -51,6 +51,8 @@ class Dataset:
                 print(f"Warning: missing commented_file in metadata in entry {metadata_data['repo']}/{metadata_data['pr_number']}")
                 print(metadata_data.keys())
             metadata = Metadata(**metadata_data)
+            if metadata.reason_for_failure == "Was still being processed":
+                continue
 
             files = {
                 fname: FileData(**fdata) for fname, fdata in entry_data["files"].items()
