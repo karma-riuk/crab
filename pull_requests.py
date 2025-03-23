@@ -3,7 +3,7 @@ from typing import Any, Callable, Optional
 from github.PullRequest import PullRequest
 from github.Repository import Repository
 import pandas as pd
-from github import Github
+from github import Github, GithubException
 from tqdm import tqdm
 from datetime import datetime
 
@@ -82,7 +82,10 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     first_commit = commits[0]
     last_commit = commits[-1]
 
-    diffs_before = {file.filename: file.patch for file in repo.compare(pr.base.sha, first_commit.sha).files}
+    try:
+        diffs_before = {file.filename: file.patch for file in repo.compare(pr.base.sha, first_commit.sha).files}
+    except GithubException as e:
+        return
 
     comments = list(pr.get_review_comments())
     assert len(comments) == 1
@@ -90,7 +93,11 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
     comment_text = comment.body
     commented_file_path = comment.path
 
-    diffs_after = {file.filename: file.patch for file in repo.compare(first_commit.sha, last_commit.sha).files}
+    try:
+        diffs_after = {file.filename: file.patch for file in repo.compare(first_commit.sha, last_commit.sha).files}
+    except GithubException as e:
+        return
+
     entry = DatasetEntry(
         metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, commented_file_path, reason_for_failure="Was still being processed"),
         files={file.filename: FileData(file.filename) for file in pr.get_files()},
