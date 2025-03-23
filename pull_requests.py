@@ -191,6 +191,13 @@ def process_repo(repo_name: str, stats_df: Optional[pd.DataFrame], dataset: Data
     repo = g.get_repo(repo_name)
     good_prs = get_good_prs(repo, stats_df)
 
+    if repo_name in cache:
+        for pr_number in tqdm(cache[repo_name], desc="Copying cached entries", leave=False):
+            dataset.entries.append(cache[repo_name][pr_number])
+        dataset.to_json(args.output)
+
+        good_prs = [pr for pr in good_prs if pr.number not in cache[repo_name]]
+
     with tqdm(good_prs, desc="Processing good prs", leave=False) as pbar:
         for pr in pbar:
             pbar.set_postfix({"pr": pr.number})
@@ -260,6 +267,6 @@ if __name__ == "__main__":
     dataset = Dataset()
     try:
         # try and finally to save, regardless of an error occuring or the program finished correctly
-        process_repos(df, stats_df, dataset, args.repos)
+        process_repos(df, stats_df, dataset, args.repos, cache)
     finally:
         dataset.to_json(args.output)
