@@ -40,19 +40,19 @@ def get_good_prs(repo: Repository, stats_df: Optional[pd.DataFrame]) -> list[Pul
     if stats_df is None or repo.full_name not in stats_df["repo"].unique():
         potenially_good_prs = prs
         number_of_prs = prs.totalCount
-        from_cached = False
+        from_stats = False
     else:
         potenially_good_prs_numbers = stats_df.loc[(stats_df["repo"] == repo.full_name) & (stats_df["has_only_1_comment"] == True)]["pr_number"]
         potenially_good_prs = [repo.get_pull(n) for n in potenially_good_prs_numbers]
         number_of_prs = len(potenially_good_prs)
-        from_cached = True
+        from_stats = True
 
     if number_of_prs == 0:
         return []
 
     with tqdm(total=number_of_prs, desc=f"Extracting good PRs from {repo.full_name}", leave=False) as pbar:
         for pr in potenially_good_prs:
-            pbar.set_postfix({"found": len(good_prs), "pr_number": pr.number, "from_cached": from_cached})
+            pbar.set_postfix({"found": len(good_prs), "pr_number": pr.number, "from_stats": from_stats})
             if pr.merged_at is None:
                 pbar.update(1)
                 continue
