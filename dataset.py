@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Dict, List
 import json
 
+from collections import defaultdict
+
 
 # fmt: off
 @dataclass
@@ -16,7 +18,7 @@ class Metadata:
     pr_number: int
     merge_commit_sha: str   # to checkout for the tests
     commented_files: Dict[str, str]   # comment -> filename
-    commented_files_coverages: Dict[str, Dict[str, float]] = field(default_factory=dict)     # filename -> jacoco-report -> coverage
+    commented_files_coverages: Dict[str, Dict[str, float]] = field(default_factory=lambda: defaultdict(dict))     # filename -> jacoco-report -> coverage
     successful: bool = True
     build_system: str = ""
     reason_for_failure: str = ""
