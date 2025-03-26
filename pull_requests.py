@@ -65,7 +65,6 @@ def process_pull(
 ):
     if pr.number in cache.get(repo.full_name, set()):
         dataset.entries.append(cache[repo.full_name][pr.number])
-        dataset.to_json(args.output)
         return
 
     commits = list(pr.get_commits())
@@ -196,7 +195,6 @@ def process_pull(
 
     if entry.metadata.successful:
         entry.metadata.reason_for_failure = ""  # was set to 'still processing', since it's done being processed and was successful, there are no reasons for failure
-    dataset.to_json(args.output)
 
 
 def process_repo(
@@ -222,6 +220,7 @@ def process_repo(
             if is_pull_good(pr):
                 n_good_prs += 1
                 process_pull(repo, pr, dataset, repos_dir, cache)
+                dataset.to_json(args.output)
 
 
 def process_repos(
