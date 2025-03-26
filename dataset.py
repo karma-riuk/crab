@@ -47,9 +47,6 @@ class Dataset:
         entries = []
         for entry_data in data["entries"]:
             metadata_data = entry_data["metadata"]
-            if "commented_file" not in metadata_data:
-                print(f"Warning: missing commented_file in metadata in entry {metadata_data['repo']}/{metadata_data['pr_number']}")
-                print(metadata_data.keys())
             metadata = Metadata(**metadata_data)
             if not keep_still_in_progress and metadata.reason_for_failure == "Was still being processed":
                 continue
