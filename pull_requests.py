@@ -210,16 +210,17 @@ def process_repo(
     prs = repo.get_pulls(state="closed")
 
     n_good_prs = 0
-    with tqdm(prs, desc="Processing prs", leave=False) as pbar:
-        for pr in pbar:
+    with tqdm(total=prs.totalCount, desc="Processing prs", leave=False) as pbar:
+        for pr in prs:
             pbar.set_postfix({"pr": pr.number, "# new good found": n_good_prs})
-            if pr.merged_at is None:
+            if pr.merged_at is None or not is_pull_good(pr):
                 pbar.update(1)
                 continue
-            if is_pull_good(pr):
-                n_good_prs += 1
-                process_pull(repo, pr, dataset, repos_dir, cache)
-                dataset.to_json(args.output)
+
+            n_good_prs += 1
+            process_pull(repo, pr, dataset, repos_dir, cache)
+            dataset.to_json(args.output)
+            pbar.update(1)
 
 
 def process_repos(
