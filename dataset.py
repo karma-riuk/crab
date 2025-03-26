@@ -12,8 +12,8 @@ class Metadata:
     repo: str # the name of the repo, with style XXX/YYY 
     pr_number: int
     merge_commit_sha: str # to checkout for the tests
-    commented_file : str
-    commented_file_coverages: Dict[str, float] = field(default_factory=dict)
+    commented_files : Dict[str, str] # comment -> filename
+    commented_files_coverages: Dict[str, Dict[str, float]] = field(default_factory=dict) # filename -> jacoco-report -> coverage
     successful: bool = True
     build_system: str = ""
     reason_for_failure: str = ""
@@ -24,7 +24,7 @@ class DatasetEntry:
     metadata: Metadata
     files: Dict[str, FileData] # filename -> file data, files before the PR (before the first PR commits)
     diffs_before: Dict[str, str] # filename -> diff, diffs between the opening of the PR and the comment
-    comment: str
+    comments: List[str]
     diffs_after: Dict[str, str] # filename -> diff, changes after the comment
 
 @dataclass
@@ -59,10 +59,9 @@ class Dataset:
                 metadata=metadata,
                 files=files,
                 diffs_before=entry_data["diffs_before"],
-                comment=entry_data["comment"],
+                comments=entry_data["comments"],
                 diffs_after=entry_data["diffs_after"]
             )
             entries.append(entry)
 
         return Dataset(entries=entries)
-

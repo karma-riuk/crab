@@ -96,10 +96,10 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         return
 
     entry = DatasetEntry(
-        metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, commented_file_path, reason_for_failure="Was still being processed"),
+            metadata=Metadata(repo.full_name, pr.number, pr.merge_commit_sha, {comment_text: commented_file_path}, reason_for_failure="Was still being processed"),
         files={file.filename: FileData(file.filename) for file in pr.get_files()},
         diffs_before=diffs_before,
-        comment=comment_text,
+        comments=[comment_text],
         diffs_after=diffs_after,
     )
     dataset.entries.append(entry)
@@ -149,7 +149,7 @@ def process_pull(repo: Repository, pr: PullRequest, dataset: Dataset, repos_dir:
         
     def _check_coverages():
         for coverage_file, coverage in build_handler.check_coverage(commented_file_path):
-            entry.metadata.commented_file_coverages[coverage_file] = coverage
+            entry.metadata.commented_files_coverages[commented_file_path][coverage_file] = coverage
 
     steps = [
         ("Checking for tests...", build_handler.check_for_tests),
