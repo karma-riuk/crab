@@ -35,34 +35,6 @@ def is_pull_good(pull: PullRequest, verbose: bool = False):
     )
 
 
-def get_good_prs(
-    repo: Repository, cache: dict[str, dict[int, DatasetEntry]] = {}
-) -> list[PullRequest]:
-    good_prs = []
-
-    potenially_good_prs = repo.get_pulls(state="closed")
-    number_of_prs = potenially_good_prs.totalCount
-
-    if number_of_prs == 0:
-        return []
-
-    with tqdm(
-        total=number_of_prs,
-        desc=f"Extracting good PRs from {repo.full_name}",
-        leave=False,
-    ) as pbar:
-        for pr in potenially_good_prs:
-            pbar.set_postfix({"new good found": len(good_prs), "pr_number": pr.number})
-            if pr.merged_at is None or pr.number in cache.get(repo.full_name, set()):
-                pbar.update(1)
-                continue
-            if is_pull_good(pr):
-                good_prs.append(pr)
-            pbar.update(1)
-
-    return good_prs
-
-
 def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", "-C", repo_path] + cmd,
@@ -238,13 +210,18 @@ def process_repo(
         dataset.entries.extend(cache[repo.full_name].values())
         dataset.to_json(args.output)
 
-    good_prs = []
-    good_prs = get_good_prs(repo, cache)
+    prs = repo.get_pulls(state="closed")
 
-    with tqdm(good_prs, desc="Processing good prs", leave=False) as pbar:
+    n_good_prs = 0
+    with tqdm(prs, desc="Processing prs", leave=False) as pbar:
         for pr in pbar:
-            pbar.set_postfix({"pr": pr.number})
-            process_pull(repo, pr, dataset, repos_dir, cache)
+            pbar.set_postfix({"pr": pr.number, "# new good found": n_good_prs})
+            if pr.merged_at is None:
+                pbar.update(1)
+                continue
+            if is_pull_good(pr):
+                n_good_prs += 1
+                process_pull(repo, pr, dataset, repos_dir, cache)
 
 
 def process_repos(
