@@ -29,9 +29,8 @@ def get_good_projects(csv_file: str) -> pd.DataFrame:
 
 
 def is_pull_good(pull: PullRequest, verbose: bool = False):
-    return (
-        has_only_1_comment(pull.get_commits(), pull.get_review_comments(), verbose=verbose)
-        and pull.user.type != "Bot"
+    return pull.user.type != "Bot" and has_only_1_comment(
+        pull.get_commits(), pull.get_review_comments(), verbose=verbose
     )
 
 
