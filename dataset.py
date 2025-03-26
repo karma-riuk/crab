@@ -40,7 +40,7 @@ class Dataset:
             json.dump(self, f, default=lambda o: o.__dict__, indent=4)
 
     @staticmethod
-    def from_json(filename: str) -> "Dataset":
+    def from_json(filename: str, keep_still_in_progress: bool = False) -> "Dataset":
         with open(filename) as f:
             data = json.load(f)
 
@@ -51,7 +51,7 @@ class Dataset:
                 print(f"Warning: missing commented_file in metadata in entry {metadata_data['repo']}/{metadata_data['pr_number']}")
                 print(metadata_data.keys())
             metadata = Metadata(**metadata_data)
-            if metadata.reason_for_failure == "Was still being processed":
+            if not keep_still_in_progress and metadata.reason_for_failure == "Was still being processed":
                 continue
 
             files = {
