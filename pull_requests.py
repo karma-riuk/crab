@@ -93,6 +93,7 @@ def process_pull(
 ):
     if pr.number in cache.get(repo.full_name, set()):
         dataset.entries.append(cache[repo.full_name][pr.number])
+        dataset.to_json(args.output)
         return
 
     commits = list(pr.get_commits())
