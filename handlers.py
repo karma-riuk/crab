@@ -104,10 +104,28 @@ class BuildHandler(ABC):
         finally:
             signal.alarm(0)  # Cancel the alarm
 
-    def generate_coverage_report(self):
+    def generate_coverage_report(self, already_injected_manually: bool = False):
         result = self.container.exec_run(self.generate_coverage_report_cmd())
         if result.exit_code != 0:
-            raise CantExecJacoco(clean_output(result.output))
+            if already_injected_manually:
+                raise CantExecJacoco(clean_output(result.output))
+
+            build_file_path = os.path.join(self.path, self.build_file)
+            if not os.path.exists(build_file_path):
+                raise CantInjectJacoco("pom.xml not found")
+            with open(build_file_path, "r") as f:
+                og_content = f.read()
+            try:
+                self._try_to_inject_jacoco(build_file_path)
+                self.generate_coverage_report(already_injected_manually=True)
+            except (CantInjectJacoco, CantExecJacoco) as e:
+                with open(build_file_path, "w") as f:
+                    f.write(og_content)
+                    raise e
+
+    @abstractmethod
+    def _try_to_inject_jacoco(self, build_file_path: str) -> None:
+        pass
 
     def check_coverage(self, filename: str) -> Iterator[Tuple[str, float]]:
         """
@@ -261,6 +279,54 @@ class MavenHandler(BuildHandler):
         if not found_at_least_one:
             raise NoCoverageReportFound(f"Couldn't find any 'jacoco.xml' in {self.path}")
 
+    def _try_to_inject_jacoco(self, build_file_path: str) -> None:
+        with open(build_file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if "<artifactId>jacoco-maven-plugin</artifactId>" in content:
+            return   # already present
+
+        jacoco_plugin = """
+    <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.8</version>
+        <executions>
+            <execution>
+                <goals>
+                    <goal>prepare-agent</goal>
+                </goals>
+            </execution>
+            <execution>
+                <id>report</id>
+                <phase>test</phase>
+                <goals>
+                    <goal>report</goal>
+                </goals>
+            </execution>
+        </executions>
+    </plugin>
+"""
+
+        if "<plugins>" in content:
+            # just insert inside existing plugins
+            content = content.replace("<plugins>", f"<plugins>\n{jacoco_plugin}")
+        elif "</project>" in content:
+            # plugins section doesn't exist, create full <build> section
+            build_block = f"""
+        <build>
+            <plugins>
+    {jacoco_plugin}
+            </plugins>
+        </build>
+    """
+            content = content.replace("</project>", f"{build_block}\n</project>")
+        else:
+            raise CantInjectJacoco("Could not find insertion point for plugins in pom.xml")
+
+        with open(build_file_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
 
 class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
@@ -341,6 +407,39 @@ class GradleHandler(BuildHandler):
                 f"Couldn't find any 'index.html' inside any 'reports/jacoco' in {self.path}"
             )
 
+    def _try_to_inject_jacoco(self, build_file_path: str) -> None:
+        with open(build_file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        if "id 'jacoco'" in content or "apply plugin: 'jacoco'" in content:
+            return  # already present
+
+        jacoco_snippet = """
+plugins {
+    id 'jacoco'
+}
+
+jacoco {
+    toolVersion = "0.8.8"
+}
+
+test {
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}"""
+
+        content = jacoco_snippet + "\n\n" + content
+
+        with open(build_file_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
 
 class HandlerException(Exception, ABC):
     reason_for_failure = "Generic handler expection (this shouldn't appear)"
@@ -364,6 +463,10 @@ class NoTestResultsToExtractError(HandlerException):
 
 class CantExecJacoco(HandlerException):
     reason_for_failure = "Couldn't execute jacoco"
+
+
+class CantInjectJacoco(HandlerException):
+    reason_for_failure = "Couldn't inject jacoco in the build file"
 
 
 class NoCoverageReportFound(HandlerException):
