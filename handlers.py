@@ -5,11 +5,12 @@ from typing import Iterable, Optional, Tuple, Iterator
 import xml.etree.ElementTree as ET
 from javalang.tree import PackageDeclaration
 
-REPORT_SIZE_THRESHOLD = 400 # less than 400 bytes (charcaters), we don't care about it
+REPORT_SIZE_THRESHOLD = 400   # less than 400 bytes (charcaters), we don't care about it
 
 
-USER_ID = os.getuid() # for container user
-GROUP_ID = os.getgid() 
+USER_ID = os.getuid()   # for container user
+GROUP_ID = os.getgid()
+
 
 class BuildHandler(ABC):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
@@ -25,17 +26,16 @@ class BuildHandler(ABC):
     def __enter__(self):
         self.container = self.client.containers.run(
             image=self.container_name(),
-            command="tail -f /dev/null", # to keep the container alive
+            command="tail -f /dev/null",  # to keep the container alive
             volumes={os.path.abspath(self.path): {"bind": "/repo", "mode": "rw"}},
             user=f"{USER_ID}:{GROUP_ID}",
             detach=True,
-            tty=True
+            tty=True,
         )
 
     def __exit__(self, *args):
         self.container.kill()
         self.container.remove()
-
 
     def check_for_tests(self) -> None:
         with open(os.path.join(self.path, self.build_file), "r") as f:
@@ -65,7 +65,7 @@ class BuildHandler(ABC):
 
     def compile_repo(self) -> None:
         def timeout_handler(signum, frame):
-           raise TimeoutError("Tests exceeded time limit")
+            raise TimeoutError("Tests exceeded time limit")
 
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(3600)  # Set timeout to 1 hour (3600 seconds)
@@ -83,7 +83,7 @@ class BuildHandler(ABC):
 
     def test_repo(self) -> None:
         def timeout_handler(signum, frame):
-           raise TimeoutError("Tests exceeded time limit")
+            raise TimeoutError("Tests exceeded time limit")
 
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(3600)  # Set timeout to 1 hour (3600 seconds)
@@ -93,7 +93,7 @@ class BuildHandler(ABC):
             output = clean_output(exec_result.output)
             if exec_result.exit_code != 0:
                 raise FailedToTestError(output)
-            
+
             self.extract_test_numbers(output)
 
         except TimeoutError:
@@ -123,13 +123,17 @@ class BuildHandler(ABC):
             candidates.append({"report_file": coverage_report_path, "fqc": fully_qualified_class})
             # if coverage_report_path[:len(src_dir)] != src_dir:
             #     continue
-            coverage = get_coverage_for_file(coverage_report_path, fully_qualified_class, os.path.basename(filename))
+            coverage = get_coverage_for_file(
+                coverage_report_path, fully_qualified_class, os.path.basename(filename)
+            )
             if coverage != -1:
                 found_at_least_one = True
                 yield coverage_report_path, coverage
 
         if not found_at_least_one:
-            raise FileNotCovered(f"File '{filename}' didn't have any coverage in any of the jacoco reports: {candidates}")
+            raise FileNotCovered(
+                f"File '{filename}' didn't have any coverage in any of the jacoco reports: {candidates}"
+            )
 
     def _extract_fully_qualified_class(self, filepath: str) -> str:
         if not filepath.endswith('.java'):
@@ -142,21 +146,24 @@ class BuildHandler(ABC):
             try:
                 parsed_tree = javalang.parse.parse(f.read())
             except javalang.parser.JavaSyntaxError as e:
-                raise NotJavaFileError(f"File '{filepath}' has a syntax error and could not be parsed by javalang, raised error: '{e}'")
+                raise NotJavaFileError(
+                    f"File '{filepath}' has a syntax error and could not be parsed by javalang, raised error: '{e}'"
+                )
 
             package_name = None
             for _, node in parsed_tree.filter(PackageDeclaration):
-                package_name = node.name # type: ignore
+                package_name = node.name   # type: ignore
                 break  # Stop after finding the first package declaration
 
             if package_name is None:
-                raise NoPackageFoundError(f"File '{filepath}' did not have a packaged name recognized by javalang")
+                raise NoPackageFoundError(
+                    f"File '{filepath}' did not have a packaged name recognized by javalang"
+                )
 
             fully_qualified_class = package_name.replace('.', '/')
             # src_dir = filepath[:filepath.index(fully_qualified_class)]
-            fully_qualified_class += "/" + os.path.basename(filepath)[:-5] # -5 to remove '.java'
+            fully_qualified_class += "/" + os.path.basename(filepath)[:-5]   # -5 to remove '.java'
             return fully_qualified_class
-
 
     def clean_repo(self) -> None:
         self.container.exec_run(self.clean_cmd())
@@ -193,6 +200,7 @@ class BuildHandler(ABC):
     def container_name(self) -> str:
         pass
 
+
 class MavenHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
         super().__init__(repo_path, build_file, updates)
@@ -212,7 +220,7 @@ class MavenHandler(BuildHandler):
 
     def clean_cmd(self) -> str:
         return f"{self.base_cmd} clean"
-    
+
     def generate_coverage_report_cmd(self):
         return f"{self.base_cmd} jacoco:report-aggregate"
 
@@ -239,19 +247,20 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_failed"] += failures
             self.updates["n_tests_errors"] += errors
             self.updates["n_tests_skipped"] += skipped
-            self.updates["n_tests_passed"] += (tests_run - (failures + errors))  # Calculate passed tests
+            self.updates["n_tests_passed"] += tests_run - (failures + errors)  # Calculate passed tests
 
     def get_jacoco_report_paths(self) -> Iterable[str]:
         found_at_least_one = False
         for root, _, files in os.walk(os.path.join(self.path)):
             if "target/site" not in root:
-                continue # to avoid any misleading jacoco.xml randomly lying around
+                continue   # to avoid any misleading jacoco.xml randomly lying around
             for file in files:
                 if file == "jacoco.xml":
                     found_at_least_one = True
                     yield os.path.join(root, file)
         if not found_at_least_one:
             raise NoCoverageReportFound(f"Couldn't find any 'jacoco.xml' in {self.path}")
+
 
 class GradleHandler(BuildHandler):
     def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
@@ -269,7 +278,7 @@ class GradleHandler(BuildHandler):
 
     def clean_cmd(self) -> str:
         return f"{self.base_cmd} clean"
-    
+
     def generate_coverage_report_cmd(self) -> str:
         return f"{self.base_cmd} jacocoTestReport"
 
@@ -290,7 +299,7 @@ class GradleHandler(BuildHandler):
         # Load the HTML file
         with open(test_results_path, "r") as file:
             soup = BeautifulSoup(file, "html.parser")
-        
+
             # test_div = soup.select_one("div", class_="infoBox", id="tests")
             test_div = soup.select_one("div.infoBox#tests")
             if test_div is None:
@@ -302,7 +311,7 @@ class GradleHandler(BuildHandler):
                 raise NoTestResultsToExtractError("No test results found (not div.counter for tests)")
 
             self.updates["n_tests"] = int(counter_div.text.strip())
-            
+
             # failures_div = soup.find("div", class_="infoBox", id="failures")
             failures_div = soup.select_one("div.infoBox#failures")
             if failures_div is None:
@@ -314,7 +323,7 @@ class GradleHandler(BuildHandler):
                 raise NoTestResultsToExtractError("No test results found (not div.counter for failures)")
 
             self.updates["n_tests_failed"] = int(counter_div.text.strip())
-            
+
             # Calculate passed tests
             self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
 
@@ -328,43 +337,58 @@ class GradleHandler(BuildHandler):
                     found_at_least_one = True
                     yield os.path.join(root, file)
         if not found_at_least_one:
-            raise NoCoverageReportFound(f"Couldn't find any 'index.html' inside any 'reports/jacoco' in {self.path}")
+            raise NoCoverageReportFound(
+                f"Couldn't find any 'index.html' inside any 'reports/jacoco' in {self.path}"
+            )
+
 
 class HandlerException(Exception, ABC):
     reason_for_failure = "Generic handler expection (this shouldn't appear)"
 
+
 class NoTestsFoundError(HandlerException):
     reason_for_failure = "No tests found"
+
 
 class FailedToCompileError(HandlerException):
     reason_for_failure = "Failed to compile"
 
+
 class FailedToTestError(HandlerException):
     reason_for_failure = "Failed to test"
+
 
 class NoTestResultsToExtractError(HandlerException):
     reason_for_failure = "Failed to extract test results"
 
+
 class CantExecJacoco(HandlerException):
     reason_for_failure = "Couldn't execute jacoco"
+
 
 class NoCoverageReportFound(HandlerException):
     reason_for_failure = "No coverage report was found"
 
+
 class FileNotCovered(HandlerException):
     reason_for_failure = "Commented file from the PR wasn't not covered"
+
 
 class GradleAggregateReportNotFound(HandlerException):
     reason_for_failure = "Couldn't find the aggregate report (with gradle it's messy)"
 
+
 class NotJavaFileError(HandlerException):
     reason_for_failure = "File that was checked for coverage was not java file"
+
 
 class NoPackageFoundError(HandlerException):
     reason_for_failure = "Java file did not contain a valid package name"
 
+
 class FileNotFoundInRepoError(HandlerException):
     reason_for_failure = "Commented file not found in repo (likely renamed or deleted)"
+
 
 def merge_download_lines(lines: list) -> list:
     """
@@ -387,6 +411,7 @@ def merge_download_lines(lines: list) -> list:
             cleaned_lines.append(line)
             downloading_block = False
     return cleaned_lines
+
 
 def merge_unapproved_licences(lines: list) -> list:
     """
@@ -412,6 +437,7 @@ def merge_unapproved_licences(lines: list) -> list:
             cleaned_lines.append(line)
     return cleaned_lines
 
+
 def clean_output(output: bytes) -> str:
     output_lines = output.decode().split("\n")
 
@@ -419,6 +445,7 @@ def clean_output(output: bytes) -> str:
     cleaned_lines = merge_unapproved_licences(cleaned_lines)
 
     return "\n".join(cleaned_lines)
+
 
 def get_coverage_for_file(xml_file: str, target_fully_qualified_class: str, basename: str) -> float:
     # Parse the XML file
@@ -428,7 +455,10 @@ def get_coverage_for_file(xml_file: str, target_fully_qualified_class: str, base
     # Find coverage for the target file
     for package in root.findall(".//package"):
         for class_ in package.findall("class"):
-            if class_.get("sourcefilename") == basename and class_.get("name") == target_fully_qualified_class:
+            if (
+                class_.get("sourcefilename") == basename
+                and class_.get("name") == target_fully_qualified_class
+            ):
                 # Extract line coverage data
                 line_counter = class_.find("counter[@type='LINE']")
                 if line_counter is not None:
@@ -442,6 +472,7 @@ def get_coverage_for_file(xml_file: str, target_fully_qualified_class: str, base
                     coverage = (covered / total) * 100 if total > 0 else 0
                     return coverage
     return -1
+
 
 def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False) -> Optional[BuildHandler]:
     """
@@ -466,7 +497,8 @@ def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False
     to_keep = ["pom.xml", "build.gradle"]
     for entry in os.scandir(path):
         if entry.is_file() and entry.name in to_keep:
-            if verbose: print(f"Found {entry.name} in {repo} root, so keeping it and returning")
+            if verbose:
+                print(f"Found {entry.name} in {repo} root, so keeping it and returning")
             updates["depth_of_build_file"] = 0
             if entry.name == "build.gradle":
                 updates["build_system"] = "gradle"
@@ -474,13 +506,14 @@ def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False
             else:
                 updates["build_system"] = "maven"
                 return MavenHandler(path, entry.name, updates)
-    
+
     # List files in the immediate subdirectories
     for entry in os.scandir(path):
         if entry.is_dir():
             for sub_entry in os.scandir(entry.path):
                 if sub_entry.is_file() and sub_entry.name in to_keep:
-                    if verbose: print(f"Found {sub_entry.name} in {repo} first level, so keeping it and returning")
+                    if verbose:
+                        print(f"Found {sub_entry.name} in {repo} first level, so keeping it and returning")
                     updates["depth_of_build_file"] = 1
                     if entry.name == "build.gradle":
                         updates["build_system"] = "gradle"
