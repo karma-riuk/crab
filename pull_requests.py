@@ -10,7 +10,7 @@ from datetime import datetime
 
 from dataset import Dataset, DatasetEntry, FileData, Metadata
 from handlers import HandlerException, get_build_handler
-from utils import has_only_1_comment, move_github_logging_to_file, clone
+from utils import has_only_1_comment, move_github_logging_to_file, clone, run_git_cmd
 
 
 def get_good_projects(csv_file: str) -> pd.DataFrame:
@@ -40,15 +40,6 @@ def is_pull_good(pull: PullRequest, verbose: bool = False) -> bool:
             return False
 
     return has_only_1_comment(pull.get_commits(), pull.get_review_comments(), verbose=verbose)
-
-
-def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", "-C", repo_path] + cmd,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
 
 
 def ensure_full_history(repo_path: str) -> None:
@@ -96,7 +87,8 @@ def process_pull(
 
     try:
         diffs_after = {
-            file.filename: file.patch for file in repo.compare(first_commit.sha, last_commit.sha).files
+            file.filename: file.patch
+            for file in repo.compare(first_commit.sha, last_commit.sha).files
         }
     except GithubException as e:
         return

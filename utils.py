@@ -147,3 +147,11 @@ def clone(repo: str, dest: str, updates: dict = {}, force: bool = False, verbose
     else:
         updates["cloned_successfully"] = True
         return True
+
+def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", "-C", repo_path] + cmd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
