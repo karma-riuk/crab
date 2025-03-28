@@ -3,6 +3,13 @@ from typing import Dict, List
 import json, os
 from github import Github
 from collections import defaultdict
+from github.PullRequest import PullRequest
+from github.Repository import Repository
+from tqdm import tqdm
+
+from github.ContentFile import ContentFile
+
+from utils import run_git_cmd
 
 
 # fmt: off
@@ -60,7 +67,7 @@ class DatasetEntry:
 
 @dataclass
 class DatasetEntry_new:
-    metadata: Metadata
+    metadata: Metadata_new
     files: Dict[str, FileData_new]   # filename -> file data, files before the PR (before the first PR commits)
     diffs_before: Dict[str, str]   # filename -> diff, diffs between the opening of the PR and the comment
     comments: List[Comment]
@@ -88,7 +95,7 @@ class Dataset:
             print("Done")
 
         entries = []
-        for entry_data in data["entries"]:
+        for entry_data in tqdm(data["entries"], desc="Loading entries"):
             metadata_data = entry_data["metadata"]
             metadata = Metadata(**metadata_data)
             if (
@@ -130,29 +137,101 @@ class Dataset_new:
 
 def migrate(dataset: Dataset) -> Dataset_new:
     ret = Dataset_new()
+    for entry in tqdm(dataset.entries, desc="Migrating entries"):
+        new_entry = new_entry_form_old(entry)
+        ret.entries.append(new_entry)
+    return ret
 
+def new_files(repo: Repository, pr: PullRequest, new_metadata: Metadata_new, old_entry: DatasetEntry, repo_path: str) -> dict[str, FileData_new]:
+    review_comments = list(pr.get_review_comments())
+    if not review_comments:
+        raise ValueError(
+            f"No review comments found for PR #{new_metadata.pr_number} in {new_metadata.repo}"
+        )
+
+    assert (
+        len(review_comments) == 1
+    ), f"Multiple review comments found for PR #{new_metadata.pr_number} in {new_metadata.repo}"
+    comment_commit_id = review_comments[0].original_commit_id
+
+    ret = {}
+    for fname in old_entry.files:
+        try:
+            contents = repo.get_contents(fname, ref=comment_commit_id)
+            assert isinstance(
+                contents, ContentFile
+            ), f"Multiple files with the same name {fname} in base sha {comment_commit_id} ({contents})"
+            content_before = contents.decoded_content.decode()
+        except Exception as e:
+            content_before = ""   # file didn't exist before the PR
+
+        if old_entry.metadata.reason_for_failure == "Couldn't fetch the PR's merge commit":
+            content_after = ""
+        else:
+            run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
+            with open(os.path.join(repo_path, fname), "r") as f:
+                content_after = f.read()
+
+        ret[fname] = FileData_new(
+            is_code_related=fname.endswith('.java'),
+            coverage=old_entry.metadata.commented_files_coverages.get(fname, {}),
+            content_before_pr=content_before,
+            content_after_pr=content_after,
+        )
+    return ret
+
+def new_comments(pr: PullRequest, new_metadata: Metadata_new) -> list[Comment]:
+    review_comments = list(pr.get_review_comments())
+    ret = [
+        Comment(
+            body=comment.body,
+            file=comment.path,
+            from_=comment.start_line if comment.start_line else comment.line,
+            to=comment.line,
+        )
+        for comment in review_comments
+    ]
+    if ret[0].from_ is None or ret[0].to is None:
+        ret[0].to = review_comments[0].original_line
+        ret[0].from_ = review_comments[0].original_start_line
+        if ret[0].from_ is None:
+            ret[0].from_ = review_comments[0].original_line
+
+        if ret[0].from_ is None or ret[0].to is None:
+            print(
+                f"PR #{new_metadata.pr_number} in {new_metadata.repo} has a comment without line numbers"
+            )
     return ret
 
 
-def fix_metadata(metadata_data: dict) -> None:
-    repo = g.get_repo(metadata_data["repo"])
-    pr = repo.get_pull(metadata_data["pr_number"])
-    if "pr_body" not in metadata_data:
-        metadata_data["pr_body"] = pr.title
-    if "pr_title" not in metadata_data:
-        metadata_data["pr_title"] = pr.body
+def new_entry_form_old(entry: DatasetEntry) -> DatasetEntry_new:
+    new_metadata = new_metadata_from_old(entry.metadata)
+    repo = g.get_repo(new_metadata.repo)
+    pr = repo.get_pull(new_metadata.pr_number)
 
-    if "commented_lines_from_to" not in metadata_data:
-        metadata_data["commented_lines_from_to"] = {}
-        for comment in pr.get_review_comments():
-            to = comment.line
-            from_ = comment.start_line
-            if from_ is None:
-                from_ = to
-            metadata_data["commented_lines_from_to"][comment.body] = {
-                "from": from_,
-                "to": to,
-            }
+    return DatasetEntry_new(
+        metadata=new_metadata,
+        files=new_files(repo, pr, new_metadata, entry, os.path.join("results", new_metadata.repo)),
+        diffs_before=entry.diffs_before,
+        comments=new_comments(pr, new_metadata),
+        diffs_after=entry.diffs_after,
+    )
+
+
+def new_metadata_from_old(metadata: Metadata) -> Metadata_new:
+    repo = g.get_repo(metadata.repo)
+    pr = repo.get_pull(metadata.pr_number)
+    return Metadata_new(
+        repo=metadata.repo,
+        pr_number=metadata.pr_number,
+        pr_title=pr.title,
+        pr_body=pr.body,
+        merge_commit_sha=metadata.merge_commit_sha,
+        successful=metadata.successful,
+        build_system=metadata.build_system,
+        reason_for_failure=metadata.reason_for_failure,
+        last_cmd_error_msg=metadata.last_cmd_error_msg,
+    )
 
 
 if __name__ == "__main__":
