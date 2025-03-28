@@ -142,6 +142,21 @@ def migrate(dataset: Dataset) -> Dataset_new:
         ret.entries.append(new_entry)
     return ret
 
+def try_decode(content: bytes) -> str:
+    try:
+        return content.decode()
+    except UnicodeDecodeError:
+        return "Binary file (from API), to be ignored"
+
+def try_read_file(fname: str) -> str:
+    if not os.path.exists(fname):
+         return "" # file was removed after the PR
+    try:
+        with open(fname, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return "Binary file (from filesystem), to be ignored"
+
 def new_files(repo: Repository, pr: PullRequest, new_metadata: Metadata_new, old_entry: DatasetEntry, repo_path: str) -> dict[str, FileData_new]:
     review_comments = list(pr.get_review_comments())
     if not review_comments:
@@ -161,16 +176,23 @@ def new_files(repo: Repository, pr: PullRequest, new_metadata: Metadata_new, old
             assert isinstance(
                 contents, ContentFile
             ), f"Multiple files with the same name {fname} in base sha {comment_commit_id} ({contents})"
-            content_before = contents.decoded_content.decode()
+            content_before = try_decode(contents.decoded_content)
         except Exception as e:
             content_before = ""   # file didn't exist before the PR
 
         if old_entry.metadata.reason_for_failure == "Couldn't fetch the PR's merge commit":
             content_after = ""
         else:
-            run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
-            with open(os.path.join(repo_path, fname), "r") as f:
-                content_after = f.read()
+            try:
+                contents = repo.get_contents(fname, ref=pr.merge_commit_sha)
+                assert isinstance(
+                    contents, ContentFile
+                ), f"Multiple files with the same name {fname} in base sha {comment_commit_id} ({contents})"
+                content_after = try_decode(contents.decoded_content)
+
+            except Exception as e:
+                run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
+                content_after = try_read_file(os.path.join(repo_path, fname))
 
         ret[fname] = FileData_new(
             is_code_related=fname.endswith('.java'),
