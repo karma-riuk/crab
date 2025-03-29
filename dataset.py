@@ -227,17 +227,27 @@ def new_comments(pr: PullRequest, new_metadata: Metadata_new) -> list[Comment]:
 
 
 def new_entry_form_old(entry: DatasetEntry) -> DatasetEntry_new:
-    new_metadata = new_metadata_from_old(entry.metadata)
-    repo = g.get_repo(new_metadata.repo)
-    pr = repo.get_pull(new_metadata.pr_number)
+    with tqdm(total=3, desc="Migrating entry", leave=False) as pbar:
+        pbar.set_postfix_str(f"Extracting metadata")
+        new_metadata = new_metadata_from_old(entry.metadata)
+        pbar.update(1)
+        repo = g.get_repo(new_metadata.repo)
+        pr = repo.get_pull(new_metadata.pr_number)
 
-    return DatasetEntry_new(
-        metadata=new_metadata,
-        files=new_files(repo, pr, new_metadata, entry, os.path.join("results", new_metadata.repo)),
-        diffs_before=entry.diffs_before,
-        comments=new_comments(pr, new_metadata),
-        diffs_after=entry.diffs_after,
-    )
+        pbar.set_postfix_str(f"Extracting files")
+        new_files_ = new_files(repo, pr, new_metadata, entry, os.path.join("results", new_metadata.repo))
+        pbar.update(1)
+        pbar.set_postfix_str(f"Extracting comments")
+        new_comments_ = new_comments(pr, new_metadata)
+        pbar.update(1)
+
+        return DatasetEntry_new(
+            metadata=new_metadata,
+            files=new_files_,
+            diffs_before=entry.diffs_before,
+            comments=new_comments_,
+            diffs_after=entry.diffs_after,
+        )
 
 
 def new_metadata_from_old(metadata: Metadata) -> Metadata_new:
