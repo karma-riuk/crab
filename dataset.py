@@ -95,7 +95,7 @@ class Dataset:
             print("Done")
 
         entries = []
-        for entry_data in tqdm(data["entries"], desc="Loading entries"):
+        for entry_data in data["entries"]:
             metadata_data = entry_data["metadata"]
             metadata = Metadata(**metadata_data)
             if (
@@ -156,6 +156,8 @@ def try_read_file(fname: str) -> str:
             return f.read()
     except FileNotFoundError:
         return "Binary file (from filesystem), to be ignored"
+    except IsADirectoryError:
+        return "File listed in PR is a directory (likely a submodule), to be ignored"
 
 def new_files(repo: Repository, pr: PullRequest, new_metadata: Metadata_new, old_entry: DatasetEntry, repo_path: str) -> dict[str, FileData_new]:
     review_comments = list(pr.get_review_comments())
