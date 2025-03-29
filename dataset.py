@@ -219,10 +219,10 @@ def new_comments(pr: PullRequest, new_metadata: Metadata_new) -> list[Comment]:
         if ret[0].from_ is None:
             ret[0].from_ = review_comments[0].original_line
 
-        if ret[0].from_ is None or ret[0].to is None:
-            print(
-                f"PR #{new_metadata.pr_number} in {new_metadata.repo} has a comment without line numbers"
-            )
+        # if ret[0].from_ is None or ret[0].to is None:
+        #     print(
+        #         f"PR #{new_metadata.pr_number} in {new_metadata.repo} has a comment without line numbers"
+        #     )
     return ret
 
 
