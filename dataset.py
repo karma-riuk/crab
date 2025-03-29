@@ -267,6 +267,7 @@ def new_metadata_from_old(metadata: Metadata) -> Metadata_new:
 
 
 if __name__ == "__main__":
+    move_github_logging_to_file()
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
 
     dataset = Dataset.from_json("dataset.json")
