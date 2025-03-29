@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from github.ContentFile import ContentFile
 
-from utils import run_git_cmd
+from utils import move_github_logging_to_file, run_git_cmd
 
 
 # fmt: off
