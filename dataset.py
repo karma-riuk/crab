@@ -154,7 +154,7 @@ def try_read_file(fname: str) -> str:
     try:
         with open(fname, "r", encoding="utf-8") as f:
             return f.read()
-    except FileNotFoundError:
+    except (UnicodeDecodeError, FileNotFoundError):
         return "Binary file (from filesystem), to be ignored"
     except IsADirectoryError:
         return "File listed in PR is a directory (likely a submodule), to be ignored"
