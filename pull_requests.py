@@ -254,25 +254,32 @@ def process_pull(
         ("Checkout out merge commit...", lambda: checkout(repo_path, pr)),
     ]
 
-    with tqdm(total=len(setup_steps), desc="Setting up PR", leave=False) as pbar:
-        for message, action in setup_steps:
-            pbar.set_postfix(
-                {
-                    "doing": message,
-                    "started at": datetime.now().strftime("%d/%m, %H:%M:%S"),
-                }
-            )
-            try:
-                action()
-            except SetupException as e:
-                entry.metadata.last_cmd_error_msg = str(e)
-                entry.metadata.reason_for_failure = e.reason_for_failure
-                entry.metadata.successful = False
-                return
-            pbar.update(1)
+    pbar = tqdm(total=len(setup_steps) + 6, desc="Processing PR", leave=False)
+    for message, action in setup_steps:
+        pbar.set_postfix(
+            {
+                "doing": message,
+                "started at": datetime.now().strftime("%d/%m, %H:%M:%S"),
+            }
+        )
+        try:
+            action()
+        except SetupException as e:
+            entry.metadata.last_cmd_error_msg = str(e)
+            entry.metadata.reason_for_failure = e.reason_for_failure
+            entry.metadata.successful = False
+            return
+        pbar.update(1)
 
     try:
+        pbar.set_postfix(
+            {
+                "doing": "Setting up build handler...",
+                "started at": datetime.now().strftime("%d/%m, %H:%M:%S"),
+            }
+        )
         build_handler = get_build_handler(repos_dir, repo.full_name)
+        pbar.update(1)
         entry.metadata.build_system = build_handler.get_type()
         build_handler.set_client(docker_client)
     except SetupException as e:
@@ -293,7 +300,7 @@ def process_pull(
         ("Checking coverage...", _check_coverages),
     ]
 
-    with build_handler, tqdm(total=len(steps), desc="Processing PR", leave=False) as pbar:
+    with build_handler:
         try:
             for message, action in steps:
                 pbar.set_postfix(
