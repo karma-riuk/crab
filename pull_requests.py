@@ -109,22 +109,22 @@ def get_diffs_after(repo: Repository, pr: PullRequest) -> dict[str, str]:
         raise NoDiffsAfterError(e)
 
 
-def checkout(repo_path: str, pr: PullRequest) -> None:
+def checkout(repo_path: str, sha: str, pr_number: int) -> None:
     try:
         ensure_full_history(repo_path)
     except subprocess.CalledProcessError as e:
         raise CantEnsureFullHistoryError(e.stderr)
 
     try:
-        run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
+        run_git_cmd(["checkout", sha], repo_path)
     except subprocess.CalledProcessError:
         try:
-            run_git_cmd(["fetch", "origin", f"pull/{pr.number}/merge"], repo_path)
+            run_git_cmd(["fetch", "origin", f"pull/{pr_number}/merge"], repo_path)
         except subprocess.CalledProcessError as e:
             raise CantFetchPRError(e.stderr)
 
         try:
-            run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
+            run_git_cmd(["checkout", sha], repo_path)
         except subprocess.CalledProcessError as e:
             raise CantCheckoutCommitError(e.stderr)
 
@@ -168,7 +168,7 @@ def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, Fi
         except UnicodeError as e:
             contents_after = "Binary content (from API), to be ignored"
         except Exception as e:
-            checkout(repo_path, pr)
+            checkout(repo_path, pr.merge_commit_sha, pr.number)
             contents_after = try_read_file(os.path.join(repo_path, file.filename))
 
         ret[file.filename] = FileData(
@@ -273,8 +273,12 @@ def process_pull(
             "Getting the comments...",
             lambda: entry.comments.extend(get_comments(pr)),
         ),
-        ("Checkout out merge commit...", lambda: checkout(repo_path, pr)),
+        ("Checkout out base commit...", lambda: checkout(repo_path, pr.base.sha, pr.number)),
         ("Archiving the repo...", lambda: archive_repo(repo_path, pr.number, archive_destination)),
+        (
+            "Checkout out merge commit...",
+            lambda: checkout(repo_path, pr.merge_commit_sha, pr.number),
+        ),
     ]
 
     pbar = tqdm(total=len(setup_steps) + 6, desc="Processing PR", leave=False)
