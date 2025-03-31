@@ -12,13 +12,9 @@ from datetime import datetime
 
 from dataset import (
     Comment,
-    Dataset,
     Dataset_new,
-    DatasetEntry,
     DatasetEntry_new,
-    FileData,
     FileData_new,
-    Metadata,
     Metadata_new,
 )
 from errors import (
