@@ -51,7 +51,7 @@ def get_good_projects(csv_file: str) -> pd.DataFrame:
 
 def is_pull_good(pull: PullRequest, verbose: bool = False) -> bool:
     comments = pull.get_review_comments()
-    if pull.user.type != "Bot" or comments.totalCount > 2:
+    if pull.user.type == "Bot" or comments.totalCount > 2:
         return False
 
     if comments.totalCount == 2:
