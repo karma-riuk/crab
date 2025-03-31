@@ -52,9 +52,12 @@ def is_pull_good(pull: PullRequest, verbose: bool = False) -> bool:
         return False
 
     if comments.totalCount == 2:
-        comment_list = list(comments)
-        second_comment = comment_list[1]
-        if second_comment.user.login != pull.user.login:
+        comment_1, comment_2 = sorted(comments, key=lambda c: c.created_at)
+
+        is_reply = comment_2.in_reply_to_id == comment_1.id
+        is_from_author = comment_2.user.id == pull.user.id
+
+        if not (is_reply and is_from_author):
             return False
 
     return has_only_1_comment(pull.get_commits(), pull.get_review_comments(), verbose=verbose)
