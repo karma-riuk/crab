@@ -7,6 +7,7 @@ from github.PullRequest import PullRequest
 from github.Repository import Repository
 import pandas as pd
 from github import Github, GithubException
+from pandas.io.common import tarfile
 from tqdm import tqdm
 from datetime import datetime
 
@@ -193,11 +194,33 @@ def get_comments(pr: PullRequest) -> list[Comment]:
     return ret
 
 
+def archive_repo(repo_path: str, pr_number: int, destination: str) -> None:
+    """
+    Archives the repo at the specified path, including only the files tracked by git.
+    The archive is stored in the destination directory with a filename based on the PR number.
+    """
+    if not os.path.exists(destination):
+        os.makedirs(destination)
+
+    archive_name = f"repo_pr_{pr_number}.tar.gz"
+    archive_path = os.path.join(destination, archive_name)
+
+    result = run_git_cmd(["ls-files"], repo_path)
+    tracked_files = result.stdout.strip().split("\n")
+
+    with tarfile.open(archive_path, "w:gz") as tar:
+        for file in tracked_files:
+            full_path = os.path.join(repo_path, file)
+            if os.path.exists(full_path):
+                tar.add(full_path, arcname=file)
+
+
 def process_pull(
     repo: Repository,
     pr: PullRequest,
     dataset: Dataset,
     repos_dir: str,
+    archive_destination: str,
     cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     if pr.number in cache.get(repo.full_name, set()):
@@ -248,6 +271,7 @@ def process_pull(
             lambda: entry.comments.extend(get_comments(pr)),
         ),
         ("Checkout out merge commit...", lambda: checkout(repo_path, pr)),
+        ("Archiving the repo...", lambda: archive_repo(repo_path, pr.number, archive_destination)),
     ]
 
     pbar = tqdm(total=len(setup_steps) + 6, desc="Processing PR", leave=False)
@@ -323,6 +347,7 @@ def process_repo(
     repo_name: str,
     dataset: Dataset,
     repos_dir: str,
+    archive_destination: str,
     cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     repo = g.get_repo(repo_name)
@@ -341,7 +366,7 @@ def process_repo(
                 continue
 
             n_good_prs += 1
-            process_pull(repo, pr, dataset, repos_dir, cache)
+            process_pull(repo, pr, dataset, repos_dir, archive_destination, cache)
             dataset.to_json(args.output)
             pbar.update(1)
 
@@ -350,6 +375,7 @@ def process_repos(
     df: pd.DataFrame,
     dataset: Dataset,
     repos_dir: str,
+    archive_destination: str,
     cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     """
@@ -373,7 +399,7 @@ def process_repos(
                     "# triplets": f"{len(dataset)}/{len(dataset.entries)} ({len(dataset)/len(dataset.entries) if len(dataset.entries) > 0 else 0:.2%})",
                 }
             )
-            process_repo(repo_name, dataset, repos_dir, cache)
+            process_repo(repo_name, dataset, repos_dir, archive_destination, cache)
             pbar.update(1)
 
 
@@ -404,6 +430,13 @@ if __name__ == "__main__":
         type=str,
         help="The name of the output file from another run of this script. This is for when the script unexpectedly got interrupted and you want to resume from where you left off.",
     )
+    parser.add_argument(
+        "-a",
+        "--archive-destination",
+        type=str,
+        default="./dataset/archives",
+        help="The directory in which the repos will be archived. Default is './dataset/archives'.",
+    )
     # parser.add_argument('-v', '--verbose', action='store_true', help='Prints the number of good projects.')
     parser.add_argument(
         "--only-repo",
@@ -429,6 +462,6 @@ if __name__ == "__main__":
 
     dataset = Dataset()
     try:
-        process_repos(df, dataset, args.repos, cache)
+        process_repos(df, dataset, args.repos, args.archive_destination, cache)
     finally:
         dataset.to_json(args.output)
