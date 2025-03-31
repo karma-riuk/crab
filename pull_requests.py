@@ -368,14 +368,17 @@ def process_repo(
     with tqdm(total=prs.totalCount, desc="Processing prs", leave=False) as pbar:
         for pr in prs:
             pbar.set_postfix({"pr": pr.number, "# new good found": n_good_prs})
-            if pr.merged_at is None or not is_pull_good(pr):
-                pbar.update(1)
-                continue
+            try:
+                if pr.merged_at is None or not is_pull_good(pr):
+                    continue
 
-            n_good_prs += 1
-            process_pull(repo, pr, dataset, repos_dir, archive_destination, cache)
-            dataset.to_json(args.output)
-            pbar.update(1)
+                n_good_prs += 1
+                process_pull(repo, pr, dataset, repos_dir, archive_destination, cache)
+                dataset.to_json(args.output)
+            except Exception as e:
+                tqdm.write(f"[ERROR] PR #{pr.number} in {repo.full_name}: {e}")
+            finally:
+                pbar.update(1)
 
 
 def process_repos(
