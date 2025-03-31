@@ -5,6 +5,8 @@ from github.PaginatedList import PaginatedList
 from github.PullRequestComment import PullRequestComment
 from tqdm import tqdm
 
+from errors import CantCloneRepoError
+
 
 def move_github_logging_to_file():
     github_logger = logging.getLogger("github")
@@ -128,46 +130,31 @@ def is_already_repo_cloned(repos_dir: str, repo_name: str) -> bool:
         return False
 
 
-def clone(
-    repo: str, dest: str, updates: dict = {}, force: bool = False, verbose: bool = False
-) -> bool:
+def clone(repo: str, dest: str, force: bool = False) -> None:
     """
-    Clones a GitHub repository into a local directory.
+    Clone a GitHub repository to the specified destination directory.
 
-    Args:
-        repo (str): The GitHub repository to clone, in the format "owner/repo".
-        dest (str): The directory to clone the repository into.
-        updates (dict, optional): A dictionary to store updates about the cloning process.
-        force (bool): Whether to force the cloning process, even if the repository already exists.
-        verbose (bool): Whether to print verbose output.
+    Parameters:
+        repo (str): The name of the repository to clone (e.g., "user/repo").
+        dest (str): The destination directory where the repository will be cloned.
+        force (bool): If True, force clone even if the repository already exists.
 
-    Returns:
-        bool: True if the repository is successfully cloned, False otherwise.
+    Raises:
+        CantCloneRepoError: If the repository cannot be cloned.
     """
     local_repo_path = os.path.join(dest, repo)
     if not force and is_already_repo_cloned(dest, repo):
-        # if verbose: print(f"Skipping {repo}, already exists")
-        updates["cloned_successfully"] = "Already exists"
-        return True
+        return
 
-    if verbose:
-        print(f"Cloning {repo}")
-    proc = subprocess.run(
-        ["git", "clone", "--depth", "1", f"https://github.com/{repo}", local_repo_path],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    if proc.returncode != 0:
-        updates["cloned_successfully"] = False
-        print(f"Failed to clone {repo}", file=sys.stderr)
-        print(f"Error message was:", file=sys.stderr)
-        error_msg = proc.stderr.decode()
-        print(error_msg, file=sys.stderr)
-        updates["error_msg"] = error_msg
-        return False
-    else:
-        updates["cloned_successfully"] = True
-        return True
+    try:
+        subprocess.run(
+            ["git", "clone", "--depth", "1", f"https://github.com/{repo}", local_repo_path],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise CantCloneRepoError(e.stderr)
 
 
 def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
