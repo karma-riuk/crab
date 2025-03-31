@@ -131,7 +131,7 @@ class Dataset_new:
             json.dump(self, f, default=lambda o: o.__dict__, indent=4)
 
     @staticmethod
-    def from_json(filename: str, keep_still_in_progress: bool = False) -> "Dataset":
+    def from_json(filename: str, keep_still_in_progress: bool = False) -> "Dataset_new":
         raise NotImplementedError("This method is not implemented yet")
 
 

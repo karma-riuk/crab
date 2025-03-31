@@ -1,6 +1,8 @@
 from collections import defaultdict
 import argparse, os, subprocess, docker
 from typing import Any, Callable
+from github.Commit import Commit
+from github.ContentFile import ContentFile
 from github.PullRequest import PullRequest
 from github.Repository import Repository
 import pandas as pd
@@ -8,7 +10,26 @@ from github import Github, GithubException
 from tqdm import tqdm
 from datetime import datetime
 
-from dataset import Dataset, DatasetEntry, FileData, Metadata
+from dataset import (
+    Comment,
+    Dataset,
+    Dataset_new,
+    DatasetEntry,
+    DatasetEntry_new,
+    FileData,
+    FileData_new,
+    Metadata,
+    Metadata_new,
+)
+from errors import (
+    CantCheckoutCommitError,
+    CantEnsureFullHistoryError,
+    CantFetchPRError,
+    MultipleFilesError,
+    NoDiffsAfterError,
+    NoDiffsBeforeError,
+    SetupException,
+)
 from handlers import HandlerException, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone, run_git_cmd
 
@@ -54,115 +75,216 @@ def reset_repo_to_latest_commit(repo_path: str) -> None:
     run_git_cmd(["reset", "--hard", current_branch], repo_path)
 
 
+def get_diffs_before(repo: Repository, pr: PullRequest) -> dict[str, str]:
+    comments = list(pr.get_review_comments())
+    comments.sort(key=lambda comment: comment.created_at)
+    first_comment = comments[0]
+    try:
+        return {
+            file.filename: file.patch
+            for file in repo.compare(pr.base.sha, first_comment.commit_id).files
+        }
+    except GithubException as e:
+        raise NoDiffsBeforeError(e)
+
+
+def get_diffs_after(repo: Repository, pr: PullRequest) -> dict[str, str]:
+    comments = list(pr.get_review_comments())
+    comments.sort(key=lambda comment: comment.created_at)
+    first_commit_after_comment = None
+    commits = list(pr.get_commits())
+    commits.sort(key=lambda commit: commit.commit.author.date)
+    for commit in commits:
+        if commit.commit.author.date > comments[0].created_at:
+            first_commit_after_comment = commit
+            break
+
+    assert first_commit_after_comment is not None, "No commit after the comment"
+
+    try:
+        return {
+            file.filename: file.patch
+            for file in repo.compare(first_commit_after_comment.sha, pr.base.sha).files
+        }
+    except GithubException as e:
+        raise NoDiffsAfterError(e)
+
+
+def checkout(repo_path: str, pr: PullRequest) -> None:
+    try:
+        ensure_full_history(repo_path)
+    except subprocess.CalledProcessError as e:
+        raise CantEnsureFullHistoryError(e.stderr)
+
+    try:
+        run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
+    except subprocess.CalledProcessError:
+        try:
+            run_git_cmd(["fetch", "origin", f"pull/{pr.number}/merge"], repo_path)
+        except subprocess.CalledProcessError as e:
+            raise CantFetchPRError(e.stderr)
+
+        try:
+            run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
+        except subprocess.CalledProcessError as e:
+            raise CantCheckoutCommitError(e.stderr)
+
+
+def try_read_file(fname: str) -> str:
+    if not os.path.exists(fname):
+        return ""   # file was removed after the PR
+    try:
+        with open(fname, "r", encoding="utf-8") as f:
+            return f.read()
+    except UnicodeDecodeError:
+        return "Binary file (from filesystem), to be ignored"
+    except IsADirectoryError:
+        return "File listed in PR is a directory (likely a submodule), to be ignored"
+
+
+def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, FileData_new]:
+    ret = {}
+    for file in pr.get_files():
+        try:
+            contents = repo.get_contents(file.filename, ref=pr.base.sha)
+            assert isinstance(
+                contents, ContentFile
+            ), f"Multiple files with the same name {file.filename} in base sha {pr.base.sha} ({contents})"
+            contents_before = contents.decoded_content.decode()
+        except AssertionError as e:
+            raise MultipleFilesError(e)
+        except UnicodeError as e:
+            contents_before = "Binary content (from API), to be ignored"
+        except Exception as e:
+            contents_before = ""   # file didn't exist before the PR
+
+        try:
+            contents = repo.get_contents(file.filename, ref=pr.merge_commit_sha)
+            assert isinstance(
+                contents, ContentFile
+            ), f"Multiple files with the same name {file.filename} in merge commit sha {pr.base.sha} ({contents})"
+            contents_after = contents.decoded_content.decode()
+        except AssertionError as e:
+            raise MultipleFilesError(e)
+        except UnicodeError as e:
+            contents_after = "Binary content (from API), to be ignored"
+        except Exception as e:
+            checkout(repo_path, pr)
+            contents_after = try_read_file(os.path.join(repo_path, file.filename))
+
+        ret[file.filename] = FileData_new(
+            is_code_related=file.filename.endswith('.java'),
+            coverage={},
+            content_before_pr=contents_before,
+            content_after_pr=contents_after,
+        )
+
+    return ret
+
+
+def get_comments(pr: PullRequest) -> list[Comment]:
+    ret = []
+    for comment in pr.get_review_comments():
+        comment = Comment(
+            body=comment.body,
+            file=comment.path,
+            from_=comment.start_line if comment.start_line else comment.line,
+            to=comment.line,
+        )
+        if comment.from_ is None or comment.to is None:
+            comment.to = comment.original_line
+            comment.from_ = comment.original_start_line
+        ret.append(comment)
+    return ret
+
+
 def process_pull(
     repo: Repository,
     pr: PullRequest,
-    dataset: Dataset,
+    dataset: Dataset_new,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry]] = {},
+    cache: dict[str, dict[int, DatasetEntry_new]] = {},
 ):
     if pr.number in cache.get(repo.full_name, set()):
         dataset.entries.append(cache[repo.full_name][pr.number])
         return
 
-    commits = list(pr.get_commits())
-    if not commits:
-        return  # No commits, skip processing
-
-    first_commit = commits[0]
-    last_commit = commits[-1]
-
-    try:
-        diffs_before = {
-            file.filename: file.patch for file in repo.compare(pr.base.sha, first_commit.sha).files
-        }
-    except GithubException as e:
-        return
+    entry = DatasetEntry_new(
+        metadata=Metadata_new(
+            repo.full_name,
+            pr.number,
+            pr.title,
+            pr.body,
+            pr.merge_commit_sha,
+            reason_for_failure="Was still being processed",
+        ),
+        files={},
+        diffs_before={},
+        comments=[],
+        diffs_after={},
+    )
+    dataset.entries.append(entry)
 
     comments = list(pr.get_review_comments())
     assert len(comments) == 1
     comment = comments[0]
-    comment_text = comment.body
     commented_file_path = comment.path
-
-    try:
-        diffs_after = {
-            file.filename: file.patch
-            for file in repo.compare(first_commit.sha, last_commit.sha).files
-        }
-    except GithubException as e:
-        return
-
-    entry = DatasetEntry(
-        metadata=Metadata(
-            repo.full_name,
-            pr.number,
-            pr.merge_commit_sha,
-            {comment_text: commented_file_path},
-            reason_for_failure="Was still being processed",
-        ),
-        files={file.filename: FileData(file.filename) for file in pr.get_files()},
-        diffs_before=diffs_before,
-        comments=[comment_text],
-        diffs_after=diffs_after,
-    )
-    dataset.entries.append(entry)
 
     repo_path = os.path.join(repos_dir, repo.full_name)
 
-    updates = {}
-    if not clone(repo.full_name, repos_dir, updates):
-        entry.metadata.last_cmd_error_msg = updates["error_msg"]
-        entry.metadata.reason_for_failure = "Couldn't clone the repo successfully"
-        entry.metadata.successful = False
+    build_handler = None
 
-    def _try_cmd(action: Callable[[], Any], reason_for_failure: str) -> bool:
-        """
-        Tries a command, and if it fails, it sets the metadata of the entry.
-        """
-        try:
-            # return action()
-            action()
-        except subprocess.CalledProcessError as e:
-            entry.metadata.last_cmd_error_msg = f"{e.stderr}"
-            entry.metadata.reason_for_failure = reason_for_failure
-            entry.metadata.successful = False
-            # raise e
-        return entry.metadata.successful
+    setup_steps = [
+        (
+            "Getting diffs before the first commit...",
+            lambda: entry.diffs_before.update(get_diffs_before(repo, pr)),
+        ),
+        (
+            "Getting diffs after the first commit...",
+            lambda: entry.diffs_after.update(get_diffs_after(repo, pr)),
+        ),
+        ("Cloning the repo...", lambda: clone(repo.full_name, repos_dir)),
+        (
+            "Getting the files...",
+            lambda: entry.files.update(get_files(pr, repo, repo_path)),
+        ),
+        (
+            "Getting the comments...",
+            lambda: entry.comments.extend(get_comments(pr)),
+        ),
+        ("Checkout out merge commit...", lambda: checkout(repo_path, pr)),
+    ]
 
-    if not _try_cmd(
-        lambda: ensure_full_history(repo_path),
-        "Couldn't ensure the full history of the repo (fetch --unshallow)",
-    ):
-        return
+    with tqdm(total=len(setup_steps), desc="Setting up PR", leave=False) as pbar:
+        for message, action in setup_steps:
+            pbar.set_postfix(
+                {
+                    "doing": message,
+                    "started at": datetime.now().strftime("%d/%m, %H:%M:%S"),
+                }
+            )
+            try:
+                action()
+            except SetupException as e:
+                entry.metadata.last_cmd_error_msg = str(e)
+                entry.metadata.reason_for_failure = e.reason_for_failure
+                entry.metadata.successful = False
+                return
+            pbar.update(1)
 
     try:
-        run_git_cmd(["checkout", pr.merge_commit_sha], repo_path)
-    except subprocess.CalledProcessError:
-        if not _try_cmd(
-            lambda: run_git_cmd(["fetch", "origin", f"pull/{pr.number}/merge"], repo_path),
-            "Couldn't fetch the PR's merge commit",
-        ):
-            return
-
-        if not _try_cmd(
-            lambda: run_git_cmd(["checkout", pr.merge_commit_sha], repo_path),
-            "Coudln't checkout the PR's merge commit (even after fetching the pull/<pr_number>/merge)",
-        ):
-            return
-
-    build_handler = get_build_handler(repos_dir, repo.full_name, updates)
-    if build_handler is None:
-        entry.metadata.last_cmd_error_msg = updates["error_msg"]
-        entry.metadata.reason_for_failure = "Couldn't get the build handler"
+        build_handler = get_build_handler(repos_dir, repo.full_name)
+        entry.metadata.build_system = build_handler.get_type()
+        build_handler.set_client(docker_client)
+    except SetupException as e:
+        entry.metadata.last_cmd_error_msg = str(e)
+        entry.metadata.reason_for_failure = e.reason_for_failure
         entry.metadata.successful = False
         return
-    entry.metadata.build_system = build_handler.get_type()
-    build_handler.set_client(docker_client)
 
     def _check_coverages():
         for coverage_file, coverage in build_handler.check_coverage(commented_file_path):
-            entry.metadata.commented_files_coverages[commented_file_path][coverage_file] = coverage
+            entry.files[commented_file_path].coverage[coverage_file] = coverage
 
     steps = [
         ("Checking for tests...", build_handler.check_for_tests),
@@ -197,9 +319,9 @@ def process_pull(
 
 def process_repo(
     repo_name: str,
-    dataset: Dataset,
+    dataset: Dataset_new,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry]] = {},
+    cache: dict[str, dict[int, DatasetEntry_new]] = {},
 ):
     repo = g.get_repo(repo_name)
     if repo.full_name in cache:
@@ -224,9 +346,9 @@ def process_repo(
 
 def process_repos(
     df: pd.DataFrame,
-    dataset: Dataset,
+    dataset: Dataset_new,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry]] = {},
+    cache: dict[str, dict[int, DatasetEntry_new]] = {},
 ):
     """
     Processes the repos in the given csv file, extracting the good ones and
@@ -254,9 +376,9 @@ def process_repos(
 
 
 def only_inject_jacoco(
-    dataset: Dataset,
+    dataset: Dataset_new,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry]] = {},
+    cache: dict[str, dict[int, DatasetEntry_new]] = {},
 ):
     n_successfull_injections = 0
     n_tried_injections = 0
@@ -344,13 +466,13 @@ if __name__ == "__main__":
     if args.only_repo is not None:
         df = df.loc[df["name"] == args.only_repo]
 
-    cache: dict[str, dict[int, DatasetEntry]] = defaultdict(dict)
+    cache: dict[str, dict[int, DatasetEntry_new]] = defaultdict(dict)
     if args.cache is not None:
-        cache_dataset = Dataset.from_json(args.cache)
+        cache_dataset = Dataset_new.from_json(args.cache)
         for cache_entry in cache_dataset.entries:
             cache[cache_entry.metadata.repo][cache_entry.metadata.pr_number] = cache_entry
 
-    dataset = Dataset()
+    dataset = Dataset_new()
     try:
         if args.only_inject_jacoco:
             only_inject_jacoco(dataset, args.repos, cache)

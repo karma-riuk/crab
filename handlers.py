@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-import os, re, docker, signal, sys, javalang
+import os, re, docker, signal, javalang
 from bs4 import BeautifulSoup
-from typing import Iterable, Optional, Tuple, Iterator
+from typing import Iterable, Tuple, Iterator
 import xml.etree.ElementTree as ET
 from javalang.tree import PackageDeclaration
+
+from errors import CantFindBuildFile, NotValidDirectory
 
 REPORT_SIZE_THRESHOLD = 400   # less than 400 bytes (charcaters), we don't care about it
 
@@ -77,7 +79,9 @@ class BuildHandler(ABC):
                 raise FailedToCompileError(output)
         except TimeoutError:
             self.updates["compiled_successfully"] = False
-            self.updates["error_msg"] = "Compile process killed due to exceeding the 1-hour time limit"
+            self.updates[
+                "error_msg"
+            ] = "Compile process killed due to exceeding the 1-hour time limit"
         finally:
             signal.alarm(0)  # Cancel the alarm
 
@@ -135,7 +139,9 @@ class BuildHandler(ABC):
         candidates = []
         for coverage_report_path in self.get_jacoco_report_paths():
             if not os.path.exists(coverage_report_path):
-                raise NoCoverageReportFound(f"Coverage report file '{coverage_report_path}' does not exist")
+                raise NoCoverageReportFound(
+                    f"Coverage report file '{coverage_report_path}' does not exist"
+                )
 
             fully_qualified_class = self._extract_fully_qualified_class(filename)
             candidates.append({"report_file": coverage_report_path, "fqc": fully_qualified_class})
@@ -220,7 +226,7 @@ class BuildHandler(ABC):
 
 
 class MavenHandler(BuildHandler):
-    def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
+    def __init__(self, repo_path: str, build_file: str, updates: dict = {}) -> None:
         super().__init__(repo_path, build_file, updates)
         self.base_cmd = "mvn -B -Dstyle.color=never -Dartifact.download.skip=true"
         # -B (Batch Mode): Runs Maven in non-interactive mode, reducing output and removing download progress bars.
@@ -265,7 +271,9 @@ class MavenHandler(BuildHandler):
             self.updates["n_tests_failed"] += failures
             self.updates["n_tests_errors"] += errors
             self.updates["n_tests_skipped"] += skipped
-            self.updates["n_tests_passed"] += tests_run - (failures + errors)  # Calculate passed tests
+            self.updates["n_tests_passed"] += tests_run - (
+                failures + errors
+            )  # Calculate passed tests
 
     def get_jacoco_report_paths(self) -> Iterable[str]:
         found_at_least_one = False
@@ -329,7 +337,7 @@ class MavenHandler(BuildHandler):
 
 
 class GradleHandler(BuildHandler):
-    def __init__(self, repo_path: str, build_file: str, updates: dict) -> None:
+    def __init__(self, repo_path: str, build_file: str, updates: dict = {}) -> None:
         super().__init__(repo_path, build_file, updates)
         self.base_cmd = "gradle --no-daemon --console=plain"
 
@@ -360,7 +368,9 @@ class GradleHandler(BuildHandler):
 
         test_results_path = os.path.join(self.path, "build/reports/tests/test/index.html")
         if not os.path.exists(test_results_path):
-            raise NoTestResultsToExtractError("No test results found (prolly a repo with sub-projects)")
+            raise NoTestResultsToExtractError(
+                "No test results found (prolly a repo with sub-projects)"
+            )
 
         # Load the HTML file
         with open(test_results_path, "r") as file:
@@ -374,7 +384,9 @@ class GradleHandler(BuildHandler):
             # counter_div = test_div.find("div", class_="counter")
             counter_div = test_div.select_one("div.counter")
             if counter_div is None:
-                raise NoTestResultsToExtractError("No test results found (not div.counter for tests)")
+                raise NoTestResultsToExtractError(
+                    "No test results found (not div.counter for tests)"
+                )
 
             self.updates["n_tests"] = int(counter_div.text.strip())
 
@@ -386,12 +398,16 @@ class GradleHandler(BuildHandler):
             # counter_div = failures_div.find("div", class_="counter")
             counter_div = failures_div.select_one("div.counter")
             if counter_div is None:
-                raise NoTestResultsToExtractError("No test results found (not div.counter for failures)")
+                raise NoTestResultsToExtractError(
+                    "No test results found (not div.counter for failures)"
+                )
 
             self.updates["n_tests_failed"] = int(counter_div.text.strip())
 
             # Calculate passed tests
-            self.updates["n_tests_passed"] = self.updates["n_tests"] - self.updates["n_tests_failed"]
+            self.updates["n_tests_passed"] = (
+                self.updates["n_tests"] - self.updates["n_tests_failed"]
+            )
 
     def get_jacoco_report_paths(self) -> Iterable[str]:
         found_at_least_one = False
@@ -577,7 +593,7 @@ def get_coverage_for_file(xml_file: str, target_fully_qualified_class: str, base
     return -1
 
 
-def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False) -> Optional[BuildHandler]:
+def get_build_handler(root: str, repo: str, verbose: bool = False) -> BuildHandler:
     """
     Get the path to the build file of a repository. The build file is either a
     `pom.xml`, `build.gradle`, or `build.xml` file.
@@ -592,38 +608,33 @@ def get_build_handler(root: str, repo: str, updates: dict, verbose: bool = False
     path = os.path.join(root, repo)
     # Check if the given path is a directory
     if not os.path.isdir(path):
-        error_msg = f"The path {path} is not a valid directory."
-        print(error_msg, file=sys.stderr)
-        updates["error_msg"] = error_msg
-        return None
+        raise NotValidDirectory(f"The path {path} is not a valid directory.")
 
     to_keep = ["pom.xml", "build.gradle"]
     for entry in os.scandir(path):
         if entry.is_file() and entry.name in to_keep:
             if verbose:
                 print(f"Found {entry.name} in {repo} root, so keeping it and returning")
-            updates["depth_of_build_file"] = 0
             if entry.name == "build.gradle":
-                updates["build_system"] = "gradle"
-                return GradleHandler(path, entry.name, updates)
+                return GradleHandler(path, entry.name)
             else:
-                updates["build_system"] = "maven"
-                return MavenHandler(path, entry.name, updates)
+                return MavenHandler(path, entry.name)
 
-    # List files in the immediate subdirectories
-    for entry in os.scandir(path):
-        if entry.is_dir():
-            for sub_entry in os.scandir(entry.path):
-                if sub_entry.is_file() and sub_entry.name in to_keep:
-                    if verbose:
-                        print(f"Found {sub_entry.name} in {repo} first level, so keeping it and returning")
-                    updates["depth_of_build_file"] = 1
-                    if entry.name == "build.gradle":
-                        updates["build_system"] = "gradle"
-                        return GradleHandler(path, os.path.join(entry.name, sub_entry.name), updates)
-                    else:
-                        updates["build_system"] = "maven"
-                        return MavenHandler(path, os.path.join(entry.name, sub_entry.name), updates)
+    raise CantFindBuildFile(f"Couldn't find any of {to_keep} build files in the directory '{path}'")
+    # # List files in the immediate subdirectories
+    # for entry in os.scandir(path):
+    #     if entry.is_dir():
+    #         for sub_entry in os.scandir(entry.path):
+    #             if sub_entry.is_file() and sub_entry.name in to_keep:
+    #                 if verbose:
+    #                     print(f"Found {sub_entry.name} in {repo} first level, so keeping it and returning")
+    #                 updates["depth_of_build_file"] = 1
+    #                 if entry.name == "build.gradle":
+    #                     updates["build_system"] = "gradle"
+    #                     return GradleHandler(path, os.path.join(entry.name, sub_entry.name), updates)
+    #                 else:
+    #                     updates["build_system"] = "maven"
+    #                     return MavenHandler(path, os.path.join(entry.name, sub_entry.name), updates)
 
-    updates["error_msg"] = "No build file found"
-    return None
+    # updates["error_msg"] = "No build file found"
+    # return None
