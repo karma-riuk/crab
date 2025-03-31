@@ -377,48 +377,6 @@ def process_repos(
             pbar.update(1)
 
 
-def only_inject_jacoco(
-    dataset: Dataset,
-    repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry]] = {},
-):
-    n_successfull_injections = 0
-    n_tried_injections = 0
-    with tqdm(cache, desc="Processing repos (only for injection") as top_bar:
-        for repo_name in top_bar:
-            top_bar.set_postfix(
-                {
-                    "# successfull injections": f"{n_successfull_injections}/{n_tried_injections} ({n_successfull_injections/n_tried_injections if n_tried_injections > 0 else 0:.2%})"
-                }
-            )
-            with tqdm(total=len(cache[repo_name]), desc=f"Processing prs", leave=False) as pbar:
-                # extracting keys so that it doesn't get messy as I pop elements from the dict
-                pr_numbers = list(cache[repo_name].keys())
-                for pr_number in pr_numbers:
-                    pbar.set_postfix({"repo": repo_name, "pr": pr_number})
-
-                    entry = cache[repo_name].pop(pr_number)
-                    if entry.metadata.reason_for_failure != "Couldn't execute jacoco":
-                        dataset.entries.append(entry)
-                        dataset.to_json(args.output)
-                        pbar.update(1)
-                        continue
-
-                    n_tried_injections += 1
-                    repo = g.get_repo(repo_name)
-                    pull = repo.get_pull(pr_number)
-                    process_pull(repo, pull, dataset, repos_dir, cache)
-                    pbar.update(1)
-                    last_addition = dataset.entries[-1]
-                    last_metadata = last_addition.metadata
-                    if (
-                        last_metadata.repo == repo_name
-                        and last_metadata.pr_number == pr_number
-                        and last_metadata.successful
-                    ):
-                        n_successfull_injections += 1
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Creates the triplets for the CRAB dataset.')
     parser.add_argument(
@@ -452,11 +410,6 @@ if __name__ == "__main__":
         type=str,
         help="If this argument is not provided, all the repos in the '--repos' csv will be processed. If instead you want to run the script on a single repo (for testing purposes mainly) provide a string of form 'XXX/YYY' to this argument, where XXX is the owner of the repo and YYY is the name of the repo",
     )
-    parser.add_argument(
-        "--only-inject-jacoco",
-        action="store_true",
-        help="You must provide a cache with --cache. It will take that cache and go through all the entries that failed because they couldn't execute jacoco and process them again, trying to inject jacoco manually",
-    )
 
     args = parser.parse_args()
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
@@ -476,9 +429,6 @@ if __name__ == "__main__":
 
     dataset = Dataset()
     try:
-        if args.only_inject_jacoco:
-            only_inject_jacoco(dataset, args.repos, cache)
-        else:
-            process_repos(df, dataset, args.repos, cache)
+        process_repos(df, dataset, args.repos, cache)
     finally:
         dataset.to_json(args.output)
