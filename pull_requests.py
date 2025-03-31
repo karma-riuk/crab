@@ -12,10 +12,10 @@ from datetime import datetime
 
 from dataset import (
     Comment,
-    Dataset_new,
-    DatasetEntry_new,
-    FileData_new,
-    Metadata_new,
+    Dataset,
+    DatasetEntry,
+    FileData,
+    Metadata,
 )
 from errors import (
     CantCheckoutCommitError,
@@ -137,7 +137,7 @@ def try_read_file(fname: str) -> str:
         return "File listed in PR is a directory (likely a submodule), to be ignored"
 
 
-def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, FileData_new]:
+def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, FileData]:
     ret = {}
     for file in pr.get_files():
         try:
@@ -167,7 +167,7 @@ def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, Fi
             checkout(repo_path, pr)
             contents_after = try_read_file(os.path.join(repo_path, file.filename))
 
-        ret[file.filename] = FileData_new(
+        ret[file.filename] = FileData(
             is_code_related=file.filename.endswith('.java'),
             coverage={},
             content_before_pr=contents_before,
@@ -196,16 +196,16 @@ def get_comments(pr: PullRequest) -> list[Comment]:
 def process_pull(
     repo: Repository,
     pr: PullRequest,
-    dataset: Dataset_new,
+    dataset: Dataset,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry_new]] = {},
+    cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     if pr.number in cache.get(repo.full_name, set()):
         dataset.entries.append(cache[repo.full_name][pr.number])
         return
 
-    entry = DatasetEntry_new(
-        metadata=Metadata_new(
+    entry = DatasetEntry(
+        metadata=Metadata(
             repo.full_name,
             pr.number,
             pr.title,
@@ -321,9 +321,9 @@ def process_pull(
 
 def process_repo(
     repo_name: str,
-    dataset: Dataset_new,
+    dataset: Dataset,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry_new]] = {},
+    cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     repo = g.get_repo(repo_name)
     if repo.full_name in cache:
@@ -348,9 +348,9 @@ def process_repo(
 
 def process_repos(
     df: pd.DataFrame,
-    dataset: Dataset_new,
+    dataset: Dataset,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry_new]] = {},
+    cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     """
     Processes the repos in the given csv file, extracting the good ones and
@@ -378,9 +378,9 @@ def process_repos(
 
 
 def only_inject_jacoco(
-    dataset: Dataset_new,
+    dataset: Dataset,
     repos_dir: str,
-    cache: dict[str, dict[int, DatasetEntry_new]] = {},
+    cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     n_successfull_injections = 0
     n_tried_injections = 0
@@ -468,13 +468,13 @@ if __name__ == "__main__":
     if args.only_repo is not None:
         df = df.loc[df["name"] == args.only_repo]
 
-    cache: dict[str, dict[int, DatasetEntry_new]] = defaultdict(dict)
+    cache: dict[str, dict[int, DatasetEntry]] = defaultdict(dict)
     if args.cache is not None:
-        cache_dataset = Dataset_new.from_json(args.cache)
+        cache_dataset = Dataset.from_json(args.cache)
         for cache_entry in cache_dataset.entries:
             cache[cache_entry.metadata.repo][cache_entry.metadata.pr_number] = cache_entry
 
-    dataset = Dataset_new()
+    dataset = Dataset()
     try:
         if args.only_inject_jacoco:
             only_inject_jacoco(dataset, args.repos, cache)

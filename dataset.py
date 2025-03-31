@@ -4,7 +4,7 @@ import json
 
 # fmt: off
 @dataclass
-class FileData_new:
+class FileData:
     is_code_related: bool
     coverage: Dict[str, float] # jacoco-report -> coverage
     content_before_pr: str = ""
@@ -18,7 +18,7 @@ class Comment:
     to: int
 
 @dataclass
-class Metadata_new:
+class Metadata:
     repo: str   # the name of the repo, with style XXX/YYY
     pr_number: int
     pr_title: str
@@ -31,9 +31,9 @@ class Metadata_new:
 
 
 @dataclass
-class DatasetEntry_new:
-    metadata: Metadata_new
-    files: Dict[str, FileData_new]   # filename -> file data, files before the PR (before the first PR commits)
+class DatasetEntry:
+    metadata: Metadata
+    files: Dict[str, FileData]   # filename -> file data, files before the PR (before the first PR commits)
     diffs_before: Dict[str, str]   # filename -> diff, diffs between the opening of the PR and the comment
     comments: List[Comment]
     diffs_after: Dict[str, str]   # filename -> diff, changes after the comment
@@ -41,8 +41,8 @@ class DatasetEntry_new:
 
 # fmt: on
 @dataclass
-class Dataset_new:
-    entries: List[DatasetEntry_new] = field(default_factory=list)
+class Dataset:
+    entries: List[DatasetEntry] = field(default_factory=list)
 
     def __len__(self) -> int:
         return sum(1 for entry in self.entries if entry.metadata.successful)
@@ -53,7 +53,7 @@ class Dataset_new:
             json.dump(self, f, default=lambda o: o.__dict__, indent=4)
 
     @staticmethod
-    def from_json(filename: str, keep_still_in_progress: bool = False) -> "Dataset_new":
+    def from_json(filename: str, keep_still_in_progress: bool = False) -> "Dataset":
         with open(filename, "r", encoding="utf-8") as f:
             print(f"Loading dataset from {filename}...", end="")
             data = json.load(f)
@@ -62,7 +62,7 @@ class Dataset_new:
         entries = []
         for entry_data in data["entries"]:
             metadata_data = entry_data["metadata"]
-            metadata = Metadata_new(**metadata_data)
+            metadata = Metadata(**metadata_data)
 
             if (
                 not keep_still_in_progress
@@ -70,11 +70,11 @@ class Dataset_new:
             ):
                 continue
 
-            files = {fname: FileData_new(**fdata) for fname, fdata in entry_data["files"].items()}
+            files = {fname: FileData(**fdata) for fname, fdata in entry_data["files"].items()}
 
             comments = [Comment(**comment) for comment in entry_data["comments"]]
 
-            entry = DatasetEntry_new(
+            entry = DatasetEntry(
                 metadata=metadata,
                 files=files,
                 diffs_before=entry_data["diffs_before"],
@@ -83,4 +83,4 @@ class Dataset_new:
             )
             entries.append(entry)
 
-        return Dataset_new(entries=entries)
+        return Dataset(entries=entries)
