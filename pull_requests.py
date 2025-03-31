@@ -90,21 +90,20 @@ def get_diffs_before(repo: Repository, pr: PullRequest) -> dict[str, str]:
 
 def get_diffs_after(repo: Repository, pr: PullRequest) -> dict[str, str]:
     comments = list(pr.get_review_comments())
-    comments.sort(key=lambda comment: comment.created_at)
-    first_commit_after_comment = None
     commits = list(pr.get_commits())
+    comments.sort(key=lambda comment: comment.created_at)
     commits.sort(key=lambda commit: commit.commit.author.date)
-    for commit in commits:
-        if commit.commit.author.date > comments[0].created_at:
-            first_commit_after_comment = commit
-            break
 
-    assert first_commit_after_comment is not None, "No commit after the comment"
-
+    # remove from the commtis the ones that happened after the first comment
+    first_comment = comments[0]
+    for commit in commits[:]:
+        if commit.commit.author.date > first_comment.created_at:
+            commits.remove(commit)
+    last_commit_before_comments = commits[-1]
     try:
         return {
             file.filename: file.patch
-            for file in repo.compare(first_commit_after_comment.sha, pr.base.sha).files
+            for file in repo.compare(last_commit_before_comments.sha, pr.merge_commit_sha).files
         }
     except GithubException as e:
         raise NoDiffsAfterError(e)
