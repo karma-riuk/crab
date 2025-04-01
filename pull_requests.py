@@ -254,8 +254,8 @@ def process_pull(
     )
     dataset.entries.append(entry)
 
-    comments = list(pr.get_review_comments())
-    assert len(comments) == 1
+    comments = pr.get_review_comments()
+    assert comments.totalCount == 1
     comment = comments[0]
     commented_file_path = comment.path
 
