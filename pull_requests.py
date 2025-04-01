@@ -382,8 +382,10 @@ def process_repo(
     cache: dict[str, dict[int, DatasetEntry]] = {},
 ):
     repo = g.get_repo(repo_name)
+    already_seen_prs = set()
     if repo.full_name in cache:
         dataset.entries.extend(cache[repo.full_name].values())
+        already_seen_prs = set(cache[repo.full_name].keys())
         dataset.to_json(args.output)
 
     prs = repo.get_pulls(state="closed")
@@ -393,7 +395,7 @@ def process_repo(
         for pr in prs:
             pbar.set_postfix({"pr": pr.number, "# new good found": n_good_prs})
             try:
-                if pr.merged_at is None or not is_pull_good(pr):
+                if pr.merged_at is None or pr.number in already_seen_prs or not is_pull_good(pr):
                     continue
 
                 n_good_prs += 1
