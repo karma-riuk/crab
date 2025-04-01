@@ -344,7 +344,7 @@ def process_pull(
         ("Checking coverage...", _check_coverages),
     ]
 
-    if all(not entry.files[comment.file].is_code_related for comment in entry.comments):
+    if all(not comment.file.endswith(".java") for comment in entry.comments):
         # if the commented files are all not code related, why bother compiling and testing the code?
         pbar.update(5)
     else:
