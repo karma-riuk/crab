@@ -9,7 +9,7 @@ import pandas as pd
 from github import Github, GithubException
 from pandas.io.common import tarfile
 from tqdm import tqdm
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dataset import (
     Comment,
@@ -474,8 +474,19 @@ if __name__ == "__main__":
         type=str,
         help="Run the script on a single repo (format: 'owner/name'). If not set, all repos in '--repos' CSV are processed.",
     )
+    parser.add_argument(
+        "--cache-requests",
+        action="store_true",
+        help="Cache GitHub API requests in a SQLite file using 'requests_cache' (in optional-requirements.txt). Speeds up reruns but may serve stale data.",
+    )
 
     args = parser.parse_args()
+
+    if args.cache_requests:
+        import requests_cache
+
+        requests_cache.install_cache('github_cache', expire_after=timedelta(weeks=2))
+
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
     docker_client = docker.from_env()
     move_github_logging_to_file()
