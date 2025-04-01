@@ -201,7 +201,9 @@ def get_comments(pr: PullRequest) -> list[Comment]:
     return ret
 
 
-def archive_repo(repo_path: str, pr_number: int, destination: str, post_fix: str) -> None:
+def archive_repo(
+    repo_path: str, repo_name: str, pr_number: int, destination: str, post_fix: str
+) -> None:
     """
     Archives the repo at the specified path, including only the files tracked by git.
     The archive is stored in the destination directory with a filename based on the PR number.
@@ -209,7 +211,7 @@ def archive_repo(repo_path: str, pr_number: int, destination: str, post_fix: str
     if not os.path.exists(destination):
         os.makedirs(destination)
 
-    archive_name = f"{repo_path.replace('/', '_')}_{pr_number}_{post_fix}.tar.gz"
+    archive_name = f"{repo_name.replace('/', '_')}_{pr_number}_{post_fix}.tar.gz"
     archive_path = os.path.join(destination, archive_name)
 
     result = run_git_cmd(["ls-files"], repo_path)
@@ -280,7 +282,7 @@ def process_pull(
         ("Checkout out base commit...", lambda: checkout(repo_path, pr.base.sha, pr.number)),
         (
             "Archiving the repo...",
-            lambda: archive_repo(repo_path, pr.number, archive_destination, "base"),
+            lambda: archive_repo(repo_path, repo.full_name, pr.number, archive_destination, "base"),
         ),
         (
             "Checkout out merge commit...",
@@ -288,7 +290,9 @@ def process_pull(
         ),
         (
             "Archiving the repo...",
-            lambda: archive_repo(repo_path, pr.number, archive_destination, "merged"),
+            lambda: archive_repo(
+                repo_path, repo.full_name, pr.number, archive_destination, "merged"
+            ),
         ),
     ]
 
