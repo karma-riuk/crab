@@ -342,24 +342,28 @@ def process_pull(
         ("Checking coverage...", _check_coverages),
     ]
 
-    with build_handler:
-        try:
-            for message, action in steps:
-                pbar.set_postfix(
-                    {
-                        "doing": message,
-                        "started at": datetime.now().strftime("%d/%m, %H:%M:%S"),
-                    }
-                )
-                action()
-                pbar.update(1)
-        except HandlerException as e:
-            entry.metadata.last_cmd_error_msg = str(e)
-            entry.metadata.reason_for_failure = e.reason_for_failure
-            entry.metadata.successful = False
-        finally:
-            build_handler.clean_repo()
-            reset_repo_to_latest_commit(repo_path)
+    if all(not entry.files[comment.file].is_code_related for comment in entry.comments):
+        # if the commented files are all not code related, why bother compiling and testing the code?
+        pbar.update(5)
+    else:
+        with build_handler:
+            try:
+                for message, action in steps:
+                    pbar.set_postfix(
+                        {
+                            "doing": message,
+                            "started at": datetime.now().strftime("%d/%m, %H:%M:%S"),
+                        }
+                    )
+                    action()
+                    pbar.update(1)
+            except HandlerException as e:
+                entry.metadata.last_cmd_error_msg = str(e)
+                entry.metadata.reason_for_failure = e.reason_for_failure
+                entry.metadata.successful = False
+            finally:
+                build_handler.clean_repo()
+                reset_repo_to_latest_commit(repo_path)
 
     if entry.metadata.successful:
         entry.metadata.reason_for_failure = ""  # was set to 'still processing', since it's done being processed and was successful, there are no reasons for failure
