@@ -368,7 +368,7 @@ def process_pull(
                 reset_repo_to_latest_commit(repo_path)
 
     if entry.metadata.successful:
-        entry.metadata.reason_for_failure = ""  # was set to 'still processing', since it's done being processed and was successful, there are no reasons for failure
+        entry.metadata.reason_for_failure = "Valid PR!"  # was set to 'still processing', since it's done being processed and was successful, there are no reasons for failure
 
 
 def process_repo(
