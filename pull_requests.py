@@ -475,12 +475,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--only-repo",
         type=str,
+        metavar="OWNER/NAME",
         help="Run the script on a single repo (format: 'owner/name'). If not set, all repos in '--repos' CSV are processed.",
     )
     parser.add_argument(
         "--cache-requests",
         action="store_true",
-        help="Cache GitHub API requests in a SQLite file using 'requests_cache' (in optional-requirements.txt). Speeds up reruns but may serve stale data.",
+        help="Caches GitHub API requests in a SQLite file using 'requests_cache' (see optional-requirements.txt). Useful for faster reruns if the script crashes or you’re tweaking it. Might produce stale data.",
     )
 
     args = parser.parse_args()
