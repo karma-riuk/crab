@@ -42,7 +42,9 @@ def get_good_projects(csv_file: str) -> pd.DataFrame:
     Returns:
     pd.DataFrame: The good projects.
     """
+    print(f"Reading {csv_file}...", end="")
     df = pd.read_csv(csv_file)
+    print("Done")
     return df.loc[(df['good_repo_for_crab'] == True) & (df['n_tests'] > 0)]
 
 
