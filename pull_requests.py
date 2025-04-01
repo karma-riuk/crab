@@ -490,7 +490,8 @@ if __name__ == "__main__":
 
         requests_cache.install_cache('github_cache', expire_after=timedelta(weeks=2))
 
-    g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"])
+    g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"], seconds_between_requests=0)
+
     docker_client = docker.from_env()
     move_github_logging_to_file()
 
