@@ -395,7 +395,7 @@ def process_repo(
                 process_pull(repo, pr, dataset, repos_dir, archive_destination, cache)
                 dataset.to_json(args.output)
             except Exception as e:
-                tqdm.write(f"[ERROR] PR #{pr.number} in {repo.full_name}: {e}")
+                tqdm.write(f"[ERROR] PR #{pr.number} in {repo.full_name}. {type(e)}: {e}")
             finally:
                 pbar.update(1)
 
