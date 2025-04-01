@@ -472,7 +472,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--only-repo",
         type=str,
-        help="If this argument is not provided, all the repos in the '--repos' csv will be processed. If instead you want to run the script on a single repo (for testing purposes mainly) provide a string of form 'XXX/YYY' to this argument, where XXX is the owner of the repo and YYY is the name of the repo",
+        help="Run the script on a single repo (format: 'owner/name'). If not set, all repos in '--repos' CSV are processed.",
     )
 
     args = parser.parse_args()
