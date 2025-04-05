@@ -1,6 +1,5 @@
 from collections import defaultdict
 import argparse, os, subprocess, docker
-from typing import Any, Callable
 from github.Commit import Commit
 from github.ContentFile import ContentFile
 from github.PullRequest import PullRequest
