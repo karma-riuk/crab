@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 import json
 
 # fmt: off
@@ -18,6 +18,12 @@ class Comment:
     to: int
 
 @dataclass
+class Selection:
+    comment_suggests_change: bool
+    diff_after_address_change: Optional[bool]
+    good: Optional[bool]
+
+@dataclass
 class Metadata:
     repo: str   # the name of the repo, with style XXX/YYY
     pr_number: int
@@ -28,7 +34,7 @@ class Metadata:
     build_system: str = ""
     reason_for_failure: str = ""
     last_cmd_error_msg: str = ""
-
+    selection: Optional[Selection] = None
 
 @dataclass
 class DatasetEntry:
@@ -55,13 +61,16 @@ class Dataset:
     @staticmethod
     def from_json(filename: str, keep_still_in_progress: bool = False) -> "Dataset":
         with open(filename, "r", encoding="utf-8") as f:
-            print(f"Loading dataset from {filename}...", end="")
+            print(f"Loading dataset from {filename}...", end=" ", flush=True)
             data = json.load(f)
             print("Done")
 
         entries = []
         for entry_data in data["entries"]:
             metadata_data = entry_data["metadata"]
+            selection_data = metadata_data["selection"] if "selection" in metadata_data else None
+            selection = Selection(**selection_data) if selection_data else None
+            metadata_data["selection"] = selection
             metadata = Metadata(**metadata_data)
 
             if (
