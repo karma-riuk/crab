@@ -164,3 +164,14 @@ def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
     )
+
+
+def prompt_yes_no(prompt: str) -> bool:
+    while True:
+        ans = input(f"{prompt} [y/n]: ").strip().lower()
+        if ans in {"y", "yes"}:
+            return True
+        elif ans in {"n", "no"}:
+            return False
+        else:
+            print("Please enter 'y' or 'n'.")
