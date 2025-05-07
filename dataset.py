@@ -111,6 +111,7 @@ class Dataset:
             ]
 
         to_dump = Dataset(entries=entries_to_dump)
+        print(f"{len(entries_to_dump)} entries...", end=" ", flush=True)
 
         def transform_entry(entry: DatasetEntry | Dataset | Any) -> dict | list:
             if not isinstance(entry, (DatasetEntry, Dataset)):
@@ -196,7 +197,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     dataset = Dataset.from_json(args.filename)
-    print(f"Loaded {len(dataset)} entries from {args.filename}")
+    print(f"Loaded {len(dataset.entries)} entries from {args.filename}")
     if os.path.exists(args.output):
         overwrite = prompt_yes_no(
             f"Output file {args.output} already exists. Do you want to overwrite it?"
@@ -204,6 +205,6 @@ if __name__ == "__main__":
         if not overwrite:
             print("Exiting without saving.")
             exit(0)
-    print(f"Saving dataset to {args.output}...", end=" ", flush=True)
+    print(f"Saving dataset to {args.output},", end=" ", flush=True)
     dataset.to_json(args.output, OutputType(args.output_type))
     print("Done")
