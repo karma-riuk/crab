@@ -166,12 +166,18 @@ def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
     )
 
 
-def prompt_yes_no(prompt: str) -> bool:
+def prompt_yes_no(prompt: str, *, default: bool | None = None) -> bool:
+    choices = "y/n"
+    if default is not None:
+        choices = "Y/n" if default else "y/N"
+
     while True:
-        ans = input(f"{prompt} [y/n]: ").strip().lower()
+        ans = input(f"{prompt} [{choices}]: ").strip().lower()
         if ans in {"y", "yes"}:
             return True
         elif ans in {"n", "no"}:
             return False
+        elif default is not None:
+            return default
         else:
             print("Please enter 'y' or 'n'.")
