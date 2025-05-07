@@ -92,7 +92,12 @@ class Dataset:
     def __len__(self) -> int:
         return sum(1 for entry in self.entries if entry.metadata.successful)
 
-    def to_json(self, filename: str, type_: OutputType = OutputType.FULL) -> None:
+    def to_json(
+        self,
+        filename: str,
+        type_: OutputType = OutputType.FULL,
+        remove_non_suggesting: bool = False,
+    ) -> None:
         """Serialize the dataset to a JSON file"""
 
         entries_to_dump = self.entries
@@ -108,6 +113,12 @@ class Dataset:
                 entry
                 for entry in self.entries
                 if entry.metadata.selection and entry.metadata.selection.diff_after_address_change
+            ]
+        elif type_ == OutputType.FULL and remove_non_suggesting:
+            entries_to_dump = [
+                entry
+                for entry in self.entries
+                if entry.metadata.selection and entry.metadata.selection.comment_suggests_change
             ]
 
         to_dump = Dataset(entries=entries_to_dump)
@@ -194,6 +205,11 @@ if __name__ == "__main__":
         default=OutputType.FULL.value,
         help="Type of output to generate",
     )
+    parser.add_argument(
+        "--remove-non-suggesting",
+        action="store_true",
+        help="Applies only when output type is full. When this flag is given, removes the entries that don't suggest change",
+    )
     args = parser.parse_args()
 
     dataset = Dataset.from_json(args.filename)
@@ -206,5 +222,5 @@ if __name__ == "__main__":
             print("Exiting without saving.")
             exit(0)
     print(f"Saving dataset to {args.output},", end=" ", flush=True)
-    dataset.to_json(args.output, OutputType(args.output_type))
+    dataset.to_json(args.output, OutputType(args.output_type), args.remove_non_suggesting)
     print("Done")
