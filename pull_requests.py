@@ -1,5 +1,5 @@
 from collections import defaultdict
-import argparse, os, subprocess, docker
+import argparse, os, subprocess, docker, uuid
 from github.Commit import Commit
 from github.ContentFile import ContentFile
 from github.PullRequest import PullRequest
@@ -239,6 +239,7 @@ def process_pull(
 
     entry = DatasetEntry(
         metadata=Metadata(
+            uuid.uuid4().hex,
             repo.full_name,
             pr.number,
             pr.title,
