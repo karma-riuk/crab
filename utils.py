@@ -1,5 +1,6 @@
 import os, sys, logging, subprocess
 from datetime import datetime
+from typing import Optional
 from github.Commit import Commit
 from github.PaginatedList import PaginatedList
 from github.PullRequestComment import PullRequestComment
@@ -166,7 +167,7 @@ def run_git_cmd(cmd: list[str], repo_path: str) -> subprocess.CompletedProcess:
     )
 
 
-def prompt_yes_no(prompt: str, *, default: bool | None = None) -> bool:
+def prompt_yes_no(prompt: str, *, default: Optional[bool] = None) -> bool:
     choices = "y/n"
     if default is not None:
         choices = "Y/n" if default else "y/N"

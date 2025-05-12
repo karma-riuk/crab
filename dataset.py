@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 import json, argparse, os, uuid
 from utils import prompt_yes_no
 
@@ -124,7 +124,7 @@ class Dataset:
         to_dump = Dataset(entries=entries_to_dump)
         print(f"{len(entries_to_dump)} entries...", end=" ", flush=True)
 
-        def transform_entry(entry: DatasetEntry | Dataset | Any) -> dict | list:
+        def transform_entry(entry: Union[DatasetEntry, Dataset, Any]) -> Union[dict, list]:
             if not isinstance(entry, (DatasetEntry, Dataset)):
                 return entry.__dict__
 
