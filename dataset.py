@@ -17,6 +17,7 @@ class Comment:
     file: str
     from_: int
     to: int
+    paraphrases: List[str] = field(default_factory=list)
 
 @dataclass
 class Selection:
