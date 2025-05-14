@@ -489,7 +489,7 @@ if __name__ == "__main__":
     if args.cache_requests:
         import requests_cache
 
-        requests_cache.install_cache('github_cache', expire_after=timedelta(weeks=2))
+        requests_cache.install_cache('github_cache', expire_after=requests_cache.NEVER_EXPIRE)
 
     g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"], seconds_between_requests=0)
 
