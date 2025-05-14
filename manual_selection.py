@@ -77,6 +77,7 @@ def edit_hunk(hunk: str) -> str:
 
 def main(
     dataset_path: str,
+    output: str,
     overwrite: bool = False,
     validation_mode: ValidationMode = ValidationMode.REFINEMENT,
     check_diff_relevance: bool = False,
@@ -230,8 +231,8 @@ def main(
     except KeyboardInterrupt:
         print("\nInterrupted.")
     finally:
-        print(f"Saving dataset to {dataset_path}...", end=" ", flush=True)
-        dataset.to_json(dataset_path)
+        print(f"Saving dataset to {output}...", end=" ", flush=True)
+        dataset.to_json(output)
         print("Done")
 
 
@@ -239,7 +240,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Manual selection of dataset")
     parser.add_argument("dataset", type=str, help="Path to the dataset file")
     parser.add_argument(
-        "-o", "--overwrite", action="store_true", help="Re-evaluate existing selections"
+        "-o",
+        "--output",
+        required=True,
+        type=str,
+        help="The path to the resulting dataset",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Re-evaluate existing selections",
     )
     parser.add_argument(
         "-m",
