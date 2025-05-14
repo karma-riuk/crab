@@ -122,7 +122,7 @@ def checkout(repo_path: str, sha: str, pr_number: int) -> None:
         raise CantEnsureFullHistoryError(e.stderr)
 
     try:
-        run_git_cmd(["checkout", sha], repo_path)
+        run_git_cmd(["checkout", "-f", sha], repo_path)
     except subprocess.CalledProcessError:
         try:
             run_git_cmd(["fetch", "origin", f"pull/{pr_number}/merge"], repo_path)
@@ -130,7 +130,7 @@ def checkout(repo_path: str, sha: str, pr_number: int) -> None:
             raise CantFetchPRError(e.stderr)
 
         try:
-            run_git_cmd(["checkout", sha], repo_path)
+            run_git_cmd(["checkout", "-f", sha], repo_path)
         except subprocess.CalledProcessError as e:
             raise CantCheckoutCommitError(e.stderr)
 
