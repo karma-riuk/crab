@@ -121,7 +121,9 @@ class Dataset:
             entries_to_dump = [
                 entry
                 for entry in self.entries
-                if entry.metadata.selection and entry.metadata.selection.diff_after_address_change
+                if entry.metadata.selection
+                and entry.metadata.selection.diff_after_address_change
+                and entry.metadata.selection.is_code_related
             ]
         elif type_ == OutputType.FULL and remove_non_suggesting:
             entries_to_dump = [
