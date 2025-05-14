@@ -122,6 +122,7 @@ def main(
             pr_url = f"https://github.com/{entry.metadata.repo}/pull/{entry.metadata.pr_number}"
             print(f"\nPull Request : {pr_url}")
 
+            is_code_related = any(file.file.endswith('.java') for file in entry.comments)
             for comment in entry.comments:
                 print("\nComment:", comment.body)
 
@@ -136,15 +137,17 @@ def main(
                     entry.metadata.selection = Selection(
                         comment_suggests_change=False,
                         diff_after_address_change=None,
-                        good=False,
+                        is_code_related=any(file.file.endswith('.java') for file in entry.comments),
                     )
                     break
 
                 if validation_mode == ValidationMode.COMMENT:
                     entry.metadata.selection = Selection(
                         comment_suggests_change=True,
-                        diff_after_address_change=None,
-                        good=True,
+                        diff_after_address_change=sel.diff_after_address_change
+                        if sel is not None
+                        else None,
+                        is_code_related=is_code_related,
                     )
                     n_good += 1
                     break
@@ -169,7 +172,7 @@ def main(
                     entry.metadata.selection = Selection(
                         comment_suggests_change=True,
                         diff_after_address_change=False,
-                        good=False,
+                        is_code_related=is_code_related,
                     )
                     break
 
@@ -208,7 +211,7 @@ def main(
                         entry.metadata.selection = Selection(
                             comment_suggests_change=True,
                             diff_after_address_change=False,
-                            good=False,
+                            is_code_related=is_code_related,
                         )
                         break
 
@@ -223,7 +226,7 @@ def main(
                 entry.metadata.selection = Selection(
                     comment_suggests_change=True,
                     diff_after_address_change=True,
-                    good=True,
+                    is_code_related=is_code_related,
                 )
                 if len(relevant_diffs) > 0:
                     n_good += 1
