@@ -131,7 +131,7 @@ class Dataset:
             ]
 
         to_dump = Dataset(entries=entries_to_dump)
-        print(f"{len(entries_to_dump)} entries...", end=" ", flush=True)
+        # print(f"{len(entries_to_dump)} entries...", end=" ", flush=True)
 
         def transform_entry(entry: Union[DatasetEntry, Dataset, Any]) -> Union[dict, list]:
             if not isinstance(entry, (DatasetEntry, Dataset)):
