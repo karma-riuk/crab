@@ -189,6 +189,14 @@ class Dataset:
 
         return Dataset(entries=entries)
 
+    def build_reference_map(self) -> Dict[str, DatasetEntry]:
+        """Build a reference map for the dataset"""
+
+        ref_map = {}
+        for entry in self.entries:
+            ref_map[entry.metadata.id] = entry
+        return ref_map
+
 
 if __name__ == "__main__":
     from utils import prompt_yes_no
