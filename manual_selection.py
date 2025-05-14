@@ -106,7 +106,6 @@ def main(
                     and sel.comment_suggests_change is not None
                 ):
                     n_good += int(sel.comment_suggests_change)
-                    continue
                 if (
                     validation_mode == ValidationMode.REFINEMENT
                     and sel.diff_after_address_change is not None
