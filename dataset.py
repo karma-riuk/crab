@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Union
 import json, argparse, os, uuid
-from utils import prompt_yes_no
 
 # fmt: off
 @dataclass
@@ -192,6 +191,8 @@ class Dataset:
 
 
 if __name__ == "__main__":
+    from utils import prompt_yes_no
+
     parser = argparse.ArgumentParser(description="Dataset class")
     parser.add_argument(
         "-f",
