@@ -269,6 +269,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(
         args.dataset,
+        args.output,
         overwrite=args.overwrite,
         validation_mode=ValidationMode(args.mode),
         check_diff_relevance=args.check_diff_relevance,
