@@ -25,6 +25,9 @@ class Selection:
     diff_after_address_change: Optional[bool]
     is_code_related: bool
 
+class ArchiveState(Enum):
+    BASE = "base"
+    MERGED = "merged"
 
 @dataclass
 class Metadata:
@@ -39,6 +42,11 @@ class Metadata:
     reason_for_failure: str = ""
     last_cmd_error_msg: str = ""
     selection: Optional[Selection] = None
+
+    def archive_name(self, state: ArchiveState, only_id:bool=False):
+        if only_id:
+            return f"{self.id}_{state.value}.tar.gz"
+        return f"{self.repo.replace('/', '_')}_{self.pr_number}_{state.value}.tar.gz"
 
 @dataclass
 class DatasetEntry:
