@@ -11,6 +11,7 @@ from tqdm import tqdm
 from datetime import datetime, timedelta
 
 from dataset import (
+    ArchiveState,
     Comment,
     Dataset,
     DatasetEntry,
@@ -202,9 +203,7 @@ def get_comments(pr: PullRequest) -> list[Comment]:
     return ret
 
 
-def archive_repo(
-    repo_path: str, repo_name: str, pr_number: int, destination: str, post_fix: str
-) -> None:
+def archive_repo(repo_path: str, metadata: Metadata, destination: str, state: ArchiveState) -> None:
     """
     Archives the repo at the specified path, including only the files tracked by git.
     The archive is stored in the destination directory with a filename based on the PR number.
@@ -212,7 +211,7 @@ def archive_repo(
     if not os.path.exists(destination):
         os.makedirs(destination)
 
-    archive_name = f"{repo_name.replace('/', '_')}_{pr_number}_{post_fix}.tar.gz"
+    archive_name = metadata.archive_name(state)
     archive_path = os.path.join(destination, archive_name)
 
     result = run_git_cmd(["ls-files"], repo_path)
@@ -237,16 +236,17 @@ def process_pull(
         dataset.entries.append(cache[repo.full_name][pr.number])
         return
 
+    metadata = Metadata(
+        uuid.uuid4().hex,
+        repo.full_name,
+        pr.number,
+        pr.title,
+        pr.body,
+        pr.merge_commit_sha,
+        reason_for_failure="Was still being processed",
+    )
     entry = DatasetEntry(
-        metadata=Metadata(
-            uuid.uuid4().hex,
-            repo.full_name,
-            pr.number,
-            pr.title,
-            pr.body,
-            pr.merge_commit_sha,
-            reason_for_failure="Was still being processed",
-        ),
+        metadata=metadata,
         files={},
         diffs_before={},
         comments=[],
@@ -284,7 +284,7 @@ def process_pull(
         ("Checkout out base commit...", lambda: checkout(repo_path, pr.base.sha, pr.number)),
         (
             "Archiving the repo...",
-            lambda: archive_repo(repo_path, repo.full_name, pr.number, archive_destination, "base"),
+            lambda: archive_repo(repo_path, metadata, archive_destination, ArchiveState.BASE),
         ),
         (
             "Checkout out merge commit...",
@@ -292,9 +292,7 @@ def process_pull(
         ),
         (
             "Archiving the repo...",
-            lambda: archive_repo(
-                repo_path, repo.full_name, pr.number, archive_destination, "merged"
-            ),
+            lambda: archive_repo(repo_path, metadata, archive_destination, ArchiveState.MERGED),
         ),
     ]
 
