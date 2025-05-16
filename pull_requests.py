@@ -382,9 +382,7 @@ def process_repo(
     repo = g.get_repo(repo_name)
     already_seen_prs = set()
     if repo.full_name in cache:
-        dataset.entries.extend(cache[repo.full_name].values())
         already_seen_prs = set(cache[repo.full_name].keys())
-        dataset.to_json(args.output)
 
     prs = repo.get_pulls(state="closed")
 
@@ -422,6 +420,10 @@ def process_repos(
         Passing it by reference in order have the latest information, in case of an error
     verbose (bool): Whether to be verbose or not
     """
+    for pr2entry in tqdm(cache.values(), desc="Adding cache in dataset"):
+        dataset.entries.extend(pr2entry.values())
+    dataset.to_json(args.output)
+
     with tqdm(total=len(df), desc="Processing repos") as pbar:
         for _, row in df.iterrows():
             repo_name = row["name"]
