@@ -1,6 +1,7 @@
-import os, sys, logging, subprocess
+import argparse
+import os, enum, logging, subprocess
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, Sequence, Type, Union
 from github.Commit import Commit
 from github.PaginatedList import PaginatedList
 from github.PullRequestComment import PullRequestComment
@@ -182,3 +183,20 @@ def prompt_yes_no(prompt: str, *, default: Optional[bool] = None) -> bool:
             return default
         else:
             print("Please enter 'y' or 'n'.")
+
+
+class EnumChoicesAction(argparse.Action):
+    def __init__(self, *args, type: Type[enum.Enum], **kwargs) -> None:
+        super().__init__(*args, **kwargs, choices=[e.value for e in type])
+        self.enum = type
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Union[str, Sequence[Any], None] = None,
+        option_string: Optional[str] = None,
+    ) -> None:
+        if not isinstance(values, str):
+            raise TypeError
+        setattr(namespace, self.dest, self.enum(values))

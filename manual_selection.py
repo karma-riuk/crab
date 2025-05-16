@@ -2,7 +2,7 @@ from typing import Optional
 from dataset import Dataset, DatasetEntry, Selection
 import argparse, os, re, click
 from enum import Enum
-from utils import prompt_yes_no
+from utils import EnumChoicesAction, prompt_yes_no
 
 HUNK_HEADER_REGEX = re.compile(r'^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@')
 
@@ -235,9 +235,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "-m",
         "--mode",
-        choices=[mode.value for mode in ValidationMode],
-        default='comment',
-        help="Validation mode: 'comment' to only check if comments suggest changes, 'refinement' to check both comment suggestions and implementation. Default is 'comment'",
+        type=ValidationMode,
+        default=ValidationMode.COMMENT,
+        action=EnumChoicesAction,
+        help=f"Validation mode: '{ValidationMode.COMMENT.value}' to only check if comments suggest changes, '{ValidationMode.REFINEMENT.value}' to check both comment suggestions and implementation. Default is '{ValidationMode.COMMENT.value}'",
     )
     parser.add_argument(
         "--check-diff-relevance",
@@ -249,6 +250,6 @@ if __name__ == "__main__":
         args.dataset,
         args.output,
         overwrite=args.overwrite,
-        validation_mode=ValidationMode(args.mode),
+        validation_mode=args.mode,
         check_diff_relevance=args.check_diff_relevance,
     )
