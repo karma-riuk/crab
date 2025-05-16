@@ -3,6 +3,18 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 import json, argparse, os, uuid
 
+
+class OutputType(Enum):
+    FULL = "full"
+    CODE_REFINEMENT = "code_refinement"
+    COMMENT_GEN = "comment_gen"
+
+
+class ArchiveState(Enum):
+    BASE = "base"
+    MERGED = "merged"
+
+
 # fmt: off
 @dataclass
 class FileData:
@@ -24,10 +36,6 @@ class Selection:
     comment_suggests_change: bool
     diff_after_address_change: Optional[bool]
     is_code_related: bool
-
-class ArchiveState(Enum):
-    BASE = "base"
-    MERGED = "merged"
 
 @dataclass
 class Metadata:
@@ -87,11 +95,6 @@ class CodeRefinementEntry:
             diffs=entry.diffs_before,
             comments=entry.comments,
         )
-
-class OutputType(Enum):
-    FULL = "full"
-    CODE_REFINEMENT = "code_refinement"
-    COMMENT_GEN = "comment_gen"
 
 # fmt: on
 @dataclass
