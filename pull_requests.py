@@ -487,7 +487,12 @@ if __name__ == "__main__":
 
         requests_cache.install_cache('github_cache', expire_after=requests_cache.NEVER_EXPIRE)
 
-    g = Github(os.environ["GITHUB_AUTH_TOKEN_CRAB"], seconds_between_requests=0)
+    github_api_token = os.environ.get("GITHUB_AUTH_TOKEN_CRAB")
+    if github_api_token is None:
+        print(
+            "[WARNING] The enviorment variable GITHUB_AUTH_TOKEN_CRAB was not set. This isn't critical, but it will significantly limit the number of GitHub requests this script can make."
+        )
+    g = Github(github_api_token, seconds_between_requests=0)
 
     docker_client = docker.from_env()
     move_github_logging_to_file()
