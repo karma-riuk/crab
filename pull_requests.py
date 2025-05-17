@@ -31,23 +31,6 @@ from handlers import HandlerException, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone, run_git_cmd
 
 
-def get_good_projects(csv_file: str) -> pd.DataFrame:
-    """
-    Extracts the good (the ones that compile and test successfully, and that
-    have at least one test) from the given file.
-
-    Parameters:
-    csv_file (str): The csv file containing the projects.
-
-    Returns:
-    pd.DataFrame: The good projects.
-    """
-    print(f"Reading {csv_file}...", end="")
-    df = pd.read_csv(csv_file)
-    print("Done")
-    return df.loc[(df['good_repo_for_crab'] == True) & (df['n_tests'] > 0)]
-
-
 def is_pull_good(pull: PullRequest, verbose: bool = False) -> bool:
     comments = pull.get_review_comments()
     if pull.user.type == "Bot" or comments.totalCount > 2 or comments.totalCount == 0:
@@ -477,6 +460,13 @@ if __name__ == "__main__":
         default="./dataset/archives",
         help="The directory in which the repos will be archived. Default is './dataset/archives'.",
     )
+    parser.add_argument(
+        "-s",
+        "--sort-by",
+        metavar="COLUMN_NAME",
+        type=str,
+        help="Sort the incoming csv by the given column. If not set, keep the original csv ordering",
+    )
     # parser.add_argument('-v', '--verbose', action='store_true', help='Prints the number of good projects.')
     parser.add_argument(
         "--only-repo",
@@ -502,7 +492,14 @@ if __name__ == "__main__":
     docker_client = docker.from_env()
     move_github_logging_to_file()
 
-    df = get_good_projects(args.csv_file)
+    # df = get_good_projects(args.csv_file)
+    df = pd.read_csv(args.csv_file)
+
+    sort_column = args.sort_by
+    if sort_column is not None:
+        if sort_column not in df.columns:
+            raise ValueError(f"Column '{sort_column}' not present in given csv file")
+        df.sort_values(sort_column, inplace=True)
 
     if args.only_repo is not None:
         df = df.loc[df["name"] == args.only_repo]
