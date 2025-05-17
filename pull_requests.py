@@ -8,7 +8,7 @@ import pandas as pd
 from github import Github, GithubException
 from pandas.io.common import tarfile
 from tqdm import tqdm
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from dataset import (
     ArchiveState,
