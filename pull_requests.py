@@ -449,6 +449,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-o',
         '--output',
+        metavar="OUTPUT_FILE_PATH",
         type=str,
         default="./dataset.json",
         help='The file in which the dataset will be contained. Default is "./dataset.json"',
@@ -457,12 +458,14 @@ if __name__ == "__main__":
         '-r',
         '--repos',
         type=str,
+        metavar="REPOS_DIR_ROOT",
         default="./results/",
         help='The directory in which the repos were cloned (will be cloned if they aren\'t there already). Default: "./results/"',
     )
     parser.add_argument(
         '-c',
         '--cache',
+        metavar="CACHE_FILE_PATH",
         type=str,
         help="The name of the output file from another run of this script. This is for when the script unexpectedly got interrupted and you want to resume from where you left off.",
     )
@@ -470,6 +473,7 @@ if __name__ == "__main__":
         "-a",
         "--archive-destination",
         type=str,
+        metavar="ARCHIVE_DIR_ROOT",
         default="./dataset/archives",
         help="The directory in which the repos will be archived. Default is './dataset/archives'.",
     )
