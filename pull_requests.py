@@ -186,15 +186,34 @@ def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, Fi
 def get_comments(pr: PullRequest) -> list[Comment]:
     ret = []
     for comment in pr.get_review_comments():
+        if (
+            comment.start_line is None
+            and comment.original_start_line is None
+            and comment.line is None
+            and comment.original_line is None
+        ):
+            raise NoLinesForCommentError(
+                f"Github gave a comment with no lines what so ever {comment}"
+            )
+
+        from_ = comment.start_line
+        if from_ is None:
+            from_ = comment.original_start_line
+
+        to = comment.line
+        if to is None:
+            to = comment.original_line
+
         comment_to_add = Comment(
             body=comment.body,
             file=comment.path,
-            from_=comment.start_line if comment.start_line else comment.line,
-            to=comment.line,
+            from_=from_,
+            to=to,
         )
-        if comment_to_add.from_ is None or comment_to_add.to is None:
-            comment_to_add.to = comment.original_line
-            comment_to_add.from_ = comment.original_start_line
+        if comment_to_add.from_ is None and comment_to_add.to is None:
+            raise NoLinesForCommentError(
+                "After creating the comment object, the from_ an to fields were None"
+            )
         ret.append(comment_to_add)
     return ret
 

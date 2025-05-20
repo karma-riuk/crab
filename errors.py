@@ -13,6 +13,10 @@ class NoDiffsAfterError(SetupException):
     reason_for_failure = "Couldn't get the diffs after the last comment"
 
 
+class NoLinesForCommentError(SetupException):
+    reason_for_failure = "There are no line reference for the comment"
+
+
 class CantCloneRepoError(SetupException):
     reason_for_failure = "Couldn't clone the repository"
 
