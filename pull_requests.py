@@ -428,7 +428,11 @@ def process_repo(
 
     n_good_prs = 0
     with tqdm(
-        total=prs.totalCount, desc=f"Processing prs of {repo_name}", leave=False, position=position
+        total=prs.totalCount,
+        desc=f"Processing prs of {repo_name}",
+        leave=False,
+        position=position,
+        unit="PR",
     ) as pbar:
         for pr in prs:
             pbar.set_postfix({"pr": pr.number, "# new good found": n_good_prs})
@@ -500,6 +504,7 @@ def process_repos_parallel(
     with tqdm(
         total=len(repo_names),
         desc="Processing repos",
+        unit="repo",
     ) as outer_pb, ProcessPoolExecutor(max_workers=n_workers) as executor:
         # Map each repo to a future
 
@@ -579,7 +584,7 @@ def process_repos(
             dataset.entries.extend(pr2entry.values())
         dataset.to_json(args.output)
 
-    with tqdm(total=len(df), desc="Processing repos") as pbar:
+    with tqdm(total=len(df), desc="Processing repos", unit="repo") as pbar:
         for _, row in df.iterrows():
             repo_name = row["name"]
             assert isinstance(repo_name, str)
