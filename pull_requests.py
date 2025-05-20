@@ -675,11 +675,5 @@ if __name__ == "__main__":
         else:
             process_repos(df, dataset, args.repos, args.archive_destination, cache)
     finally:
-        print("")
-        print("")
-        print("")
-        print("")
-        print("")
-        print("")
         print(f"Writing dataset to {args.output}")
         dataset.to_json(args.output)
