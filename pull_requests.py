@@ -435,12 +435,11 @@ def process_repo(
         unit="PR",
     ) as pbar:
         for pr in prs:
-            pbar.set_postfix({"pr": pr.number, "# new good found": n_good_prs})
+            pbar.set_postfix({"pr": pr.number})
             try:
                 if pr.number in already_seen_prs:
                     continue
 
-                n_good_prs += 1
                 process_pull(
                     repo, pr, dataset, repos_dir, archive_destination, cache, show_progress
                 )
