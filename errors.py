@@ -10,7 +10,7 @@ class NoDiffsBeforeError(SetupException):
 
 
 class NoDiffsAfterError(SetupException):
-    reason_for_failure = "Couldn't get the diffs after the last commit"
+    reason_for_failure = "Couldn't get the diffs after the last comment"
 
 
 class CantCloneRepoError(SetupException):
