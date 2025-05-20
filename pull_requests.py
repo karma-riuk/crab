@@ -454,9 +454,10 @@ def process_repos_parallel(
         archive_destination: Directory for archives
         cache: Optional cache of previously processed PR entries
     """
-    for pr2entry in tqdm(cache.values(), desc="Adding cache in dataset"):
-        dataset.entries.extend(pr2entry.values())
-    dataset.to_json(args.output)
+    if len(cache) > 0:
+        for pr2entry in tqdm(list(cache.values()), desc="Adding cache in dataset"):
+            dataset.entries.extend(pr2entry.values())
+        dataset.to_json(args.output)
 
     repo_names = df["name"]
     free_positions = list(range(1, n_workers + 1))
@@ -529,9 +530,10 @@ def process_repos(
         Passing it by reference in order have the latest information, in case of an error
     verbose (bool): Whether to be verbose or not
     """
-    for pr2entry in tqdm(cache.values(), desc="Adding cache in dataset"):
-        dataset.entries.extend(pr2entry.values())
-    dataset.to_json(args.output)
+    if len(cache) > 0:
+        for pr2entry in tqdm(list(cache.values()), desc="Adding cache in dataset"):
+            dataset.entries.extend(pr2entry.values())
+        dataset.to_json(args.output)
 
     with tqdm(total=len(df), desc="Processing repos") as pbar:
         for _, row in df.iterrows():
