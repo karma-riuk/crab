@@ -26,10 +26,11 @@ from errors import (
     MultipleFilesError,
     NoDiffsAfterError,
     NoDiffsBeforeError,
+    NoLinesForCommentError,
     SetupException,
 )
 from handlers import HandlerException, get_build_handler
-from utils import has_only_1_comment, move_github_logging_to_file, clone, run_git_cmd
+from utils import has_only_1_comment, move_logger_to_file, clone, run_git_cmd
 
 EXCLUSION_LIST = [
     "edmcouncil/idmp",  # requires authentication
@@ -647,6 +648,7 @@ if __name__ == "__main__":
         import requests_cache
 
         requests_cache.install_cache('github_cache', expire_after=requests_cache.NEVER_EXPIRE)
+        move_logger_to_file("requests_cache", "requests_cache.log")
 
     github_api_token = os.environ.get("GITHUB_AUTH_TOKEN_CRAB")
     if github_api_token is None:
@@ -656,7 +658,7 @@ if __name__ == "__main__":
     g = Github(github_api_token, seconds_between_requests=0)
 
     docker_client = docker.from_env()
-    move_github_logging_to_file()
+    move_logger_to_file("github", "github_api.log")
 
     # df = get_good_projects(args.csv_file)
     df = pd.read_csv(args.csv_file)

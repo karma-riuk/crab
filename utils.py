@@ -10,14 +10,14 @@ from tqdm import tqdm
 from errors import CantCloneRepoError
 
 
-def move_github_logging_to_file():
-    github_logger = logging.getLogger("github")
+def move_logger_to_file(logger_name, filename):
+    github_logger = logging.getLogger(logger_name)
 
     # Remove existing handlers to prevent duplicate logging
     for handler in github_logger.handlers[:]:
         github_logger.removeHandler(handler)
 
-    file_handler = logging.FileHandler("github_api.log")  # Log to file
+    file_handler = logging.FileHandler(filename)  # Log to file
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     file_handler.setFormatter(formatter)
     github_logger.addHandler(file_handler)
