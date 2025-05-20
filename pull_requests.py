@@ -41,6 +41,9 @@ EXCLUSION_LIST = [
 
 
 def is_pull_good(pull: PullRequest, verbose: bool = False) -> bool:
+    if pull.merged_at is None:
+        return False
+
     comments = pull.get_review_comments()
     if pull.user.type == "Bot" or comments.totalCount > 2 or comments.totalCount == 0:
         return False
@@ -229,6 +232,9 @@ def process_pull(
         dataset.entries.append(cache[repo.full_name][pr.number])
         return
 
+    if not is_pull_good(pr):
+        return
+
     metadata = Metadata(
         uuid.uuid4().hex,
         repo.full_name,
@@ -407,7 +413,7 @@ def process_repo(
         for pr in prs:
             pbar.set_postfix({"pr": pr.number, "# new good found": n_good_prs})
             try:
-                if pr.merged_at is None or pr.number in already_seen_prs or not is_pull_good(pr):
+                if pr.number in already_seen_prs:
                     continue
 
                 n_good_prs += 1
