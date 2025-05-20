@@ -332,10 +332,12 @@ def process_pull(
     if all(not comment.file.endswith(".java") for comment in entry.comments):
         # if the commented files are all not code related, why bother compiling and testing the code?
         pbar.update(5)
-        if entry.metadata.successful:
-            entry.metadata.reason_for_failure = "Valid PR! But isn't code related though."
+        entry.metadata.is_code_related = False
+        metadata.successful = True
+        entry.metadata.reason_for_failure = "Valid PR! But isn't code related though."
         return
 
+    entry.metadata.is_code_related = True
     with build_handler:
         try:
             for message, action in steps:
@@ -351,12 +353,27 @@ def process_pull(
             entry.metadata.last_cmd_error_msg = str(e)
             entry.metadata.reason_for_failure = e.reason_for_failure
             entry.metadata.successful = False
+        else:
+            entry.metadata.successful = True
         finally:
             build_handler.clean_repo()
             reset_repo_to_latest_commit(repo_path)
 
+    commented_files = [comment.file for comment in entry.comments]
+    is_covered = True
+    for file_name in commented_files:
+        coverage = entry.files[file_name].coverage
+        if len(coverage) == 0 or all(value == 0 for value in coverage.values()):
+            is_covered = False
+            break
+
+    entry.metadata.is_covered = is_covered
+
     if entry.metadata.successful:
-        entry.metadata.reason_for_failure = "Valid PR!"  # was set to 'still processing', since it's done being processed and was successful, there are no reasons for failure
+        if entry.metadata.is_covered:
+            entry.metadata.reason_for_failure = "Valid PR!"
+        else:
+            entry.metadata.reason_for_failure = "Valid PR! But not covered :("
 
 
 def process_repo(

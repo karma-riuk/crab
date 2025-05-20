@@ -45,7 +45,9 @@ class Metadata:
     pr_title: str
     pr_body: str
     merge_commit_sha: str   # to checkout for the tests
-    successful: bool = True
+    is_covered: Optional[bool] = None
+    is_code_related: Optional[bool] = None
+    successful: Optional[bool] = None
     build_system: str = ""
     reason_for_failure: str = ""
     last_cmd_error_msg: str = ""
