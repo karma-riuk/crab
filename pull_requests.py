@@ -31,6 +31,14 @@ from errors import (
 from handlers import HandlerException, get_build_handler
 from utils import has_only_1_comment, move_github_logging_to_file, clone, run_git_cmd
 
+EXCLUSION_LIST = [
+    "edmcouncil/idmp",  # requires authentication
+    "aosp-mirror/platform_frameworks_base",  # takes ages to clone
+    "alibaba/druid",  # tests takes literally more than 5 hours
+    "hashgraph/hedera-mirror-node",  # requires authentication
+    "Starcloud-Cloud/starcloud-llmops",  # requires authentication
+]
+
 
 def is_pull_good(pull: PullRequest, verbose: bool = False) -> bool:
     comments = pull.get_review_comments()
@@ -459,7 +467,7 @@ def process_repos_parallel(
             dataset.entries.extend(pr2entry.values())
         dataset.to_json(args.output)
 
-    repo_names = df["name"]
+    repo_names = [repo_name for repo_name in df["name"] if repo_name not in EXCLUSION_LIST]
     free_positions = list(range(1, n_workers + 1))
     repo_names_iter = iter(repo_names)
     future_to_repo = {}
@@ -539,6 +547,9 @@ def process_repos(
         for _, row in df.iterrows():
             repo_name = row["name"]
             assert isinstance(repo_name, str)
+            if repo_name in EXCLUSION_LIST:
+                pbar.update(1)
+                continue
             pbar.set_postfix(
                 {
                     "repo": repo_name,
