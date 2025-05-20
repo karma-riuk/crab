@@ -655,7 +655,7 @@ if __name__ == "__main__":
     if sort_column is not None:
         if sort_column not in df.columns:
             raise ValueError(f"Column '{sort_column}' not present in given csv file")
-        df.sort_values(sort_column, inplace=True)
+        df.sort_values(sort_column, inplace=True, ascending=False)
 
     if args.only_repo is not None:
         df = df.loc[df["name"] == args.only_repo]
