@@ -490,7 +490,7 @@ class NoCoverageReportFound(HandlerException):
 
 
 class FileNotCovered(HandlerException):
-    reason_for_failure = "Commented file from the PR wasn't not covered"
+    reason_for_failure = "Commented file from the PR was not covered"
 
 
 class GradleAggregateReportNotFound(HandlerException):
