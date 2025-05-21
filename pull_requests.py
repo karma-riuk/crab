@@ -677,7 +677,8 @@ if __name__ == "__main__":
         print(
             "[WARNING] The enviorment variable GITHUB_AUTH_TOKEN_CRAB was not set. This isn't critical, but it will significantly limit the number of GitHub requests this script can make."
         )
-    g = Github(github_api_token, seconds_between_requests=0)
+
+    g = Github(github_api_token, seconds_between_requests=0 if args.max_workers is None else 0.15)
 
     docker_client = docker.from_env()
     move_logger_to_file("github", "github_api.log")
