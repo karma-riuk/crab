@@ -522,10 +522,10 @@ def process_repos_parallel(
                 done, _ = wait(future_to_repo, return_when=FIRST_COMPLETED)
                 for fut in done:
                     repo_finished, pos = future_to_repo.pop(fut)
+                    outer_pb.update(1)
                     entries = fut.result()
                     dataset.entries.extend(entries)
                     dataset.to_json(args.output)
-                    outer_pb.update(1)
 
                     try:
                         name = next(repo_names_iter)
