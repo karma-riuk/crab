@@ -56,5 +56,5 @@ def main():
 
 
 if __name__ == "__main__":
-    move_logger_to_file()
+    move_logger_to_file("github", "github_api.log")
     main()
