@@ -426,7 +426,6 @@ def process_repo(
 
     prs = repo.get_pulls(state="closed")
 
-    n_good_prs = 0
     with tqdm(
         total=prs.totalCount,
         desc=f"Processing prs of {repo_name}",
