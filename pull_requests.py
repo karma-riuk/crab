@@ -23,6 +23,7 @@ from errors import (
     CantCheckoutCommitError,
     CantEnsureFullHistoryError,
     CantFetchPRError,
+    CommentedFileNotInOriginalChanges,
     MultipleFilesError,
     NoDiffsAfterError,
     NoDiffsBeforeError,
@@ -185,7 +186,10 @@ def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, Fi
 
 def get_comments(pr: PullRequest) -> list[Comment]:
     ret = []
+    filenames = {file.filename for file in pr.get_files()}
     for comment in pr.get_review_comments():
+        if comment.path not in filenames:
+            raise CommentedFileNotInOriginalChanges(f"File {comment.path} not in {filenames}")
         if (
             comment.start_line is None
             and comment.original_start_line is None

@@ -17,6 +17,12 @@ class NoLinesForCommentError(SetupException):
     reason_for_failure = "There are no line reference for the comment"
 
 
+class CommentedFileNotInOriginalChanges(SetupException):
+    reason_for_failure = (
+        "Commented file is not part of the original PR (most like due to a merge of another branch)"
+    )
+
+
 class CantCloneRepoError(SetupException):
     reason_for_failure = "Couldn't clone the repository"
 
