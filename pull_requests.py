@@ -1,5 +1,5 @@
 from collections import defaultdict
-import argparse, os, subprocess, docker, uuid
+import argparse, os, subprocess, docker, uuid, sys, traceback
 from concurrent.futures import wait, FIRST_COMPLETED, ProcessPoolExecutor, Future
 from github.Commit import Commit
 from github.ContentFile import ContentFile
@@ -448,7 +448,14 @@ def process_repo(
                 )
                 # dataset.to_json(args.output)
             except Exception as e:
-                tqdm.write(f"[ERROR] PR #{pr.number} in {repo.full_name}. {type(e)}: {e}")
+                exc_type, _, exc_tb = sys.exc_info()
+                assert exc_tb is not None
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                print(exc_type, fname, exc_tb.tb_lineno)
+                tqdm.write(
+                    f"[ERROR] PR #{pr.number} in {repo.full_name}. {exc_type} in {fname} at {exc_tb.tb_lineno}: {e}"
+                )
+                tqdm.write(traceback.format_exc())
             finally:
                 pbar.update(1)
 
