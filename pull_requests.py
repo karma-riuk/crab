@@ -52,8 +52,8 @@ def is_pull_good(pull: PullRequest, verbose: bool = False) -> bool:
 
     if comments.totalCount == 2:
         comment_1, comment_2 = sorted(comments, key=lambda c: c.created_at)
-        if comment_2.user is not None:
-            return False   # we can't if the second is from the author, so we discard the PR
+        if comment_2.user is None:
+            return False
 
         if comment_1.user is not None and not (
             comment_2.in_reply_to_id == comment_1.id  # is reply
