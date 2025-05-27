@@ -8,6 +8,7 @@ class OutputType(Enum):
     FULL = "full"
     CODE_REFINEMENT = "code_refinement"
     COMMENT_GEN = "comment_gen"
+    WEBAPP = "webapp"
 
 
 class ArchiveState(Enum):
@@ -130,7 +131,7 @@ class Dataset:
                 and entry.metadata.selection.diff_after_address_change
                 and entry.metadata.selection.is_code_related
             ]
-        elif type_ == OutputType.FULL and remove_non_suggesting:
+        elif type_ in {OutputType.FULL, OutputType.WEBAPP} and remove_non_suggesting:
             entries_to_dump = [
                 entry
                 for entry in self.entries
@@ -146,6 +147,16 @@ class Dataset:
 
             if type_ == OutputType.FULL:
                 return entry.__dict__
+
+            if type_ == OutputType.WEBAPP:
+                if isinstance(entry, DatasetEntry):
+                    ret = {
+                        "metadata": entry.metadata,
+                        "comments": entry.comments,
+                    }
+                    return ret
+                else:
+                    return entry.__dict__
 
             if isinstance(entry, Dataset):
                 return entry.entries
@@ -229,7 +240,7 @@ if __name__ == "__main__":
         "--output_type",
         choices=[mode.value for mode in OutputType],
         default=OutputType.FULL.value,
-        help="Type of output to generate",
+        help="Type of output to generate. webapp is just to keep what's necessary for the webapp to run, i.e. the metadata and the comments.",
     )
     parser.add_argument(
         "--remove-non-suggesting",
