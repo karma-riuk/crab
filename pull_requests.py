@@ -8,6 +8,7 @@ from github.Repository import Repository
 import pandas as pd
 from github import Github, GithubException
 from pandas.io.common import tarfile
+import requests
 from tqdm import tqdm
 from datetime import datetime
 
@@ -447,6 +448,8 @@ def process_repo(
                     repo, pr, dataset, repos_dir, archive_destination, cache, show_progress
                 )
                 # dataset.to_json(args.output)
+            except (requests.exceptions.RetryError, requests.exceptions.ReadTimeout) as r_e:
+                tqdm.write(f"[ERROR] {type(r_e)}: {r_e}")
             except Exception as e:
                 exc_type, _, exc_tb = sys.exc_info()
                 assert exc_tb is not None
