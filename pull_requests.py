@@ -504,7 +504,9 @@ def process_repos_parallel(
     if len(cache) > 0:
         for pr2entry in tqdm(list(cache.values()), desc="Adding cache in dataset"):
             dataset.entries.extend(pr2entry.values())
+        print(f"Saving dataset to {args.output}...", end=" ", flush=True)
         dataset.to_json(args.output)
+        print("Done")
 
     repo_names = [repo_name for repo_name in df["name"] if repo_name not in EXCLUSION_LIST]
     free_positions = list(range(1, n_workers + 1))
