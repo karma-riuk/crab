@@ -90,10 +90,11 @@ def display_pr_info(entry: DatasetEntry, i: int, total: int, n_good: int):
 def prompt_comment_suggestion(
     entry: DatasetEntry, sel: Optional[Selection], overwrite: bool
 ) -> bool:
+    if len(entry.comments) == 0:
+        return False
     # reuse existing if available and not overwriting
     if not overwrite and sel is not None and sel.comment_suggests_change is not None:
         return sel.comment_suggests_change
-    # show comments
     for c in entry.comments:
         print(f"\nComment: {c.body}")
     return prompt_yes_no("Do the comment suggest a change?")
@@ -106,10 +107,9 @@ def show_diffs(entry):
         print(pretty_diff(diff) if diff else "EMPTY DIFF")
 
 
-def ask_diff_relevance(entry: DatasetEntry, sel: Optional[Selection], overwrite: bool) -> bool:
-    if not overwrite and sel is not None and sel.diff_after_address_change is not None:
-        return sel.diff_after_address_change
+def ask_diff_relevance(entry: DatasetEntry) -> bool:
     show_diffs(entry)
+    print(f"Comment: {entry.comments[0].body}")
     return prompt_yes_no(f"Are {bold('any')} of these diffs related to the comment?")
 
 
@@ -130,7 +130,10 @@ def select_relevant_hunks(diff: str, comment: str) -> list[str]:
 def refine_entry(
     entry: DatasetEntry, sel: Optional[Selection], overwrite: bool, check_diff: bool
 ) -> bool:
-    diff_relevant = ask_diff_relevance(entry, sel, overwrite)
+    if not overwrite and sel is not None and sel.diff_after_address_change is not None:
+        return sel.diff_after_address_change
+
+    diff_relevant = ask_diff_relevance(entry)
     if not diff_relevant:
         return False
 
@@ -163,7 +166,7 @@ def main(
         print("Running in COMMENT VALIDATION mode - only checking if comments suggest changes")
     else:
         # For refinement validation, only process successful entries
-        entries_to_process = [entry for entry in dataset.entries if entry.metadata.successful]
+        entries_to_process = [entry for entry in dataset.entries if entry.metadata.is_covered]
         print(
             "Running in REFINEMENT VALIDATION mode - checking both comment suggestions and implementation"
         )
@@ -173,20 +176,6 @@ def main(
         n_good = 0
         for i, entry in enumerate(entries_to_process, 1):
             sel = entry.metadata.selection
-            # Skip or count already processed entries if not overwriting
-            if not overwrite and sel is not None:
-                if (
-                    validation_mode == ValidationMode.COMMENT
-                    and sel.comment_suggests_change is not None
-                ):
-                    n_good += int(sel.comment_suggests_change)
-                if (
-                    validation_mode == ValidationMode.REFINEMENT
-                    and sel.diff_after_address_change is not None
-                ):
-                    n_good += int(sel.diff_after_address_change)
-                    # We'll re-ask diffs if needed below
-                # If selection exists but incomplete for this mode, proceed
 
             display_pr_info(entry, i, total, n_good)
 
