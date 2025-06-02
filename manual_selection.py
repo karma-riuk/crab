@@ -6,8 +6,6 @@ from utils import EnumChoicesAction, prompt_yes_no
 
 HUNK_HEADER_REGEX = re.compile(r'^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@')
 
-# TODO: %s/print/print/g
-
 
 class ValidationMode(Enum):
     COMMENT = "comment"
