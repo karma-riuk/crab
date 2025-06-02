@@ -126,9 +126,7 @@ class Dataset:
             entries_to_dump = [
                 entry
                 for entry in self.entries
-                if entry.metadata.selection
-                and entry.metadata.selection.diff_after_address_change
-                and entry.metadata.selection.is_code_related
+                if entry.metadata.selection and entry.metadata.selection.diff_after_address_change
             ]
         elif type_ in {OutputType.FULL, OutputType.WEBAPP} and remove_non_suggesting:
             entries_to_dump = [
@@ -180,6 +178,8 @@ class Dataset:
         for entry_data in data["entries"]:
             metadata_data = entry_data["metadata"]
             selection_data = metadata_data["selection"] if "selection" in metadata_data else None
+            if selection_data is not None and "is_code_related" in selection_data:
+                del selection_data['is_code_related']
             selection = Selection(**selection_data) if selection_data else None
             metadata_data["selection"] = selection
             if "id" not in metadata_data:
