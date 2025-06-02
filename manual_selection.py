@@ -87,7 +87,9 @@ def display_pr_info(entry: DatasetEntry, i: int, total: int, n_good: int):
     print(f"\nPull Request : {pr_url}\n")
 
 
-def prompt_comment_suggestion(entry: DatasetEntry, sel: Selection | None, overwrite: bool) -> bool:
+def prompt_comment_suggestion(
+    entry: DatasetEntry, sel: Optional[Selection], overwrite: bool
+) -> bool:
     # reuse existing if available and not overwriting
     if not overwrite and sel is not None and sel.comment_suggests_change is not None:
         return sel.comment_suggests_change
