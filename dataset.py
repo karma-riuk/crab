@@ -36,7 +36,6 @@ class Comment:
 class Selection:
     comment_suggests_change: bool
     diff_after_address_change: Optional[bool]
-    is_code_related: bool
 
 @dataclass
 class Metadata:

@@ -190,23 +190,21 @@ def main(
 
             display_pr_info(entry, i, total, n_good)
 
-            is_code_related = any(file.file.endswith('.java') for file in entry.comments)
             suggests = prompt_comment_suggestion(entry, sel, overwrite)
 
             if not suggests:
-                entry.metadata.selection = Selection(False, None, is_code_related)
+                entry.metadata.selection = Selection(False, None)
                 continue
 
             if validation_mode == ValidationMode.COMMENT:
                 entry.metadata.selection = Selection(
                     True,
                     sel.diff_after_address_change if sel is not None else None,
-                    is_code_related,
                 )
                 n_good += 1
             elif validation_mode == ValidationMode.REFINEMENT:
                 diff_relevant = refine_entry(entry, sel, overwrite, check_diff_relevance)
-                entry.metadata.selection = Selection(True, diff_relevant, is_code_related)
+                entry.metadata.selection = Selection(True, diff_relevant)
                 if diff_relevant:
                     n_good += 1
     except KeyboardInterrupt:
