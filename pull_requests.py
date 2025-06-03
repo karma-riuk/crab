@@ -201,13 +201,13 @@ def get_comments(pr: PullRequest) -> list[Comment]:
                 f"Github gave a comment with no lines what so ever {comment}"
             )
 
-        from_ = comment.start_line
+        from_ = comment.original_start_line
         if from_ is None:
-            from_ = comment.original_start_line
+            from_ = comment.start_line
 
-        to = comment.line
+        to = comment.original_line
         if to is None:
-            to = comment.original_line
+            to = comment.line
 
         comment_to_add = Comment(
             body=comment.body,
