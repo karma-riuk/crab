@@ -212,7 +212,9 @@ def ensure_comments_within_diffs(comments: list[Comment], diffs_before: dict[str
         # 3) Check that comment.from_ lies in at least one of these old‐file ranges
         in_any_range = False
         for start, end in old_ranges + new_ranges:
-            if comment.from_ is not None and start <= comment.from_ <= end:
+            if (
+                comment.from_ is not None and start <= comment.from_ <= end
+            ) or start <= comment.to <= end:
                 in_any_range = True
                 break
 
