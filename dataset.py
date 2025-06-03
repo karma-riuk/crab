@@ -3,6 +3,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 import json, argparse, os, uuid
 
+from utils import EnumChoicesAction
+
 
 class OutputType(Enum):
     FULL = "full"
@@ -235,8 +237,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-t",
         "--output_type",
-        choices=[mode.value for mode in OutputType],
-        default=OutputType.FULL.value,
+        type=OutputType,
+        default=OutputType.FULL,
+        action=EnumChoicesAction,
         help="Type of output to generate. webapp is just to keep what's necessary for the webapp to run, i.e. the metadata and the comments.",
     )
     parser.add_argument(
@@ -256,5 +259,5 @@ if __name__ == "__main__":
             print("Exiting without saving.")
             exit(0)
     print(f"Saving dataset to {args.output},", end=" ", flush=True)
-    dataset.to_json(args.output, OutputType(args.output_type), args.remove_non_suggesting)
+    dataset.to_json(args.output, args.output_type, args.remove_non_suggesting)
     print("Done")
