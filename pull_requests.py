@@ -1,5 +1,5 @@
 from collections import defaultdict
-import argparse, os, subprocess, docker, uuid, sys, traceback
+import argparse, os, subprocess, docker, uuid, sys, traceback, re
 from concurrent.futures import wait, FIRST_COMPLETED, ProcessPoolExecutor, Future
 from github.Commit import Commit
 from github.ContentFile import ContentFile
@@ -185,6 +185,43 @@ def get_files(pr: PullRequest, repo: Repository, repo_path: str) -> dict[str, Fi
     return ret
 
 
+def ensure_comments_within_diffs(comments: list[Comment], diffs_before: dict[str, str]):
+    for comment in comments:
+        filename = comment.file
+        # 1) File must exist in diffs_before
+        if filename not in diffs_before:
+            raise CommentedFileNotInOriginalChanges(
+                f"File '{filename}' not found in diffs_before; cannot locate comment."
+            )
+
+        patch_text = diffs_before[filename]
+        # 2) Parse all hunk headers of form "@@ -old_start,old_count +new_start,new_count @@"
+        old_ranges: list[tuple[int, int]] = []
+        new_ranges: list[tuple[int, int]] = []
+        for hunk in re.finditer(r"@@\s*-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s*@@", patch_text):
+            old_start = int(hunk.group(1))
+            old_count = int(hunk.group(2)) if hunk.group(2) else 1
+            # Build inclusive range [old_start, old_start + old_count - 1]
+            old_ranges.append((old_start, old_start + old_count - 1))
+
+            new_start = int(hunk.group(3))
+            new_count = int(hunk.group(4)) if hunk.group(4) else 1
+            # Build inclusive range [old_start, old_start + old_count - 1]
+            new_ranges.append((new_start, new_start + new_count - 1))
+
+        # 3) Check that comment.from_ lies in at least one of these old‐file ranges
+        in_any_range = False
+        for start, end in old_ranges + new_ranges:
+            if comment.from_ is not None and start <= comment.from_ <= end:
+                in_any_range = True
+                break
+
+        if not in_any_range:
+            raise CommentedFileNotInOriginalChanges(
+                f"Comment {comment} does not fall within any hunk of the diff_before patch."
+            )
+
+
 def get_comments(pr: PullRequest) -> list[Comment]:
     ret = []
     filenames = {file.filename for file in pr.get_files()}
@@ -304,6 +341,10 @@ def process_pull(
         (
             "Getting the comments...",
             lambda: entry.comments.extend(get_comments(pr)),
+        ),
+        (
+            "Ensureing the comments is within the diffs",
+            lambda: ensure_comments_within_diffs(entry.comments, entry.diffs_before),
         ),
         ("Checkout out base commit...", lambda: checkout(repo_path, pr.base.sha, pr.number)),
         (
