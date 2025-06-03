@@ -221,10 +221,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Dataset class")
     parser.add_argument(
-        "-f",
-        "--filename",
+        "filename",
         type=str,
-        required=True,
         help="Path to the JSON file to load",
     )
     parser.add_argument(
