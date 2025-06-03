@@ -30,6 +30,7 @@ def extract_comment_for_paraphrases(dataset_path: str, output_path: str):
             comment = entry.comments[0].__dict__
             del comment["paraphrases"]
             results[entry.metadata.id] = {
+                "link": f"https://github.com/{entry.metadata.repo}/pull/{entry.metadata.pr_number}",
                 "comment": comment,
                 "files": {fname: fdata.content_before_pr for fname, fdata in entry.files.items()},
                 "diffs_before": entry.diffs_before,
