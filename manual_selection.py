@@ -95,7 +95,33 @@ def prompt_comment_suggestion(
     # reuse existing if available and not overwriting
     if not overwrite and sel is not None and sel.comment_suggests_change is not None:
         return sel.comment_suggests_change
+
     for c in entry.comments:
+        patch_text = entry.diffs_before[c.file]
+        hunks = split_into_hunks(patch_text)
+        for hunk in hunks:
+            match = re.match(r"@@\s*-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s*@@", hunk)
+            assert match is not None, f"{hunk} has no header apparently"
+            old_start = int(match.group(1))
+            old_count = int(match.group(2)) if match.group(2) else 1
+            old_end = old_start + old_count - 1
+
+            new_start = int(match.group(3))
+            new_count = int(match.group(4)) if match.group(4) else 1
+            new_end = new_start + new_count - 1
+
+            if (
+                (
+                    c.from_ is not None
+                    and (old_start <= c.from_ <= old_end or new_start <= c.from_ <= new_end)
+                )
+                or old_start <= c.to <= old_end
+                or new_start <= c.to <= new_end
+            ):
+                print("Hunk pointed by comment:")
+                print(pretty_diff(hunk))
+                break
+
         print(f"\nComment: {c.body}")
     return prompt_yes_no("Do the comment suggest a change?")
 
