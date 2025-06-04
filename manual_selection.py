@@ -171,9 +171,9 @@ def refine_entry(
             hunks = select_relevant_hunks(diff, entry.comments[0].body)
             if hunks:
                 accumulated[fname] = "\n".join(hunks)
-        entry.diffs_after = accumulated
-        if len(accumulated):
+        if len(accumulated) == 0:
             return False
+        entry.diffs_after = accumulated
     return True
 
 
