@@ -93,6 +93,9 @@ def prompt_comment_suggestion(
     if len(entry.comments) == 0:
         return False
     # reuse existing if available and not overwriting
+    if overwrite:
+        overwrite = prompt_yes_no("Do you want to overwrite this entry for comment suggestion?")
+
     if not overwrite and sel is not None and sel.comment_suggests_change is not None:
         return sel.comment_suggests_change
 
@@ -156,6 +159,8 @@ def select_relevant_hunks(diff: str, comment: str) -> list[str]:
 def refine_entry(
     entry: DatasetEntry, sel: Optional[Selection], overwrite: bool, check_diff: bool
 ) -> bool:
+    if overwrite:
+        overwrite = prompt_yes_no("Do you want to overwrite this entry for refinement?")
     if not overwrite and sel is not None and sel.diff_after_address_change is not None:
         return sel.diff_after_address_change
 
@@ -168,6 +173,7 @@ def refine_entry(
         for fname, diff in entry.diffs_after.items():
             if not diff:
                 continue
+            print(f"File: {fname}")
             hunks = select_relevant_hunks(diff, entry.comments[0].body)
             if hunks:
                 accumulated[fname] = "\n".join(hunks)
