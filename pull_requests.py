@@ -554,7 +554,7 @@ def process_repos_parallel(
         dataset.to_json(args.output)
         print("Done")
 
-    repo_names = [repo_name for repo_name in df["name"] if repo_name not in EXCLUSION_LIST]
+    repo_names = [repo_name for repo_name in df["name"].unique() if repo_name not in EXCLUSION_LIST]
     free_positions = list(range(1, n_workers + 1))
     repo_names_iter = iter(repo_names)
     future_to_repo: dict[Future, tuple[str, int]] = {}
@@ -642,9 +642,9 @@ def process_repos(
             dataset.entries.extend(pr2entry.values())
         dataset.to_json(args.output)
 
-    with tqdm(total=len(df), desc="Processing repos", unit="repo") as pbar:
-        for _, row in df.iterrows():
-            repo_name = row["name"]
+    repo_names = df["name"].unique()
+    with tqdm(total=len(repo_names), desc="Processing repos", unit="repo") as pbar:
+        for _, repo_name in df.iterrows():
             assert isinstance(repo_name, str)
             if repo_name in EXCLUSION_LIST:
                 pbar.update(1)
