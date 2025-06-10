@@ -112,11 +112,27 @@ class CommentGenEntry:
         )
 
 @dataclass
+class CodeRefinementComment:
+    body: str
+    file: str
+    from_: int
+    to: int
+
+    @classmethod
+    def from_comment(cls, comment: Comment) -> "CodeRefinementComment":
+        return cls(
+            body=comment.body,
+            file=comment.file,
+            from_=comment.from_,
+            to=comment.to,
+        )
+
+@dataclass
 class CodeRefinementEntry:
     id: str
     files: Dict[str, str]   # filename -> file content
     diffs: Dict[str, str]   # filename -> diff, diffs between the opening of the PR and the comment
-    comments: List[Comment]
+    comments: List[CodeRefinementComment]
 
     @staticmethod
     def from_entry(entry: DatasetEntry) -> "CodeRefinementEntry":
@@ -124,7 +140,7 @@ class CodeRefinementEntry:
             id=entry.metadata.id,
             files={fname: fdata.content_before_pr for fname, fdata in entry.files.items()},
             diffs=entry.diffs_before,
-            comments=entry.comments,
+            comments=[CodeRefinementComment.from_comment(c) for c in entry.comments],
         )
 
 # fmt: on
