@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-import sys, re
+import sys, re, zipfile
 from typing import Any, Dict, List, Optional, Union
 import json, argparse, os, uuid
 import pandas as pd
@@ -155,7 +155,9 @@ class Dataset:
         self,
         filename: str,
         type_: OutputType = OutputType.FULL,
+        archives_root: Optional[str] = None,
         remove_non_suggesting: bool = False,
+        verbose: bool = False,
     ) -> None:
         """Serialize the dataset to a JSON file"""
 
@@ -171,7 +173,9 @@ class Dataset:
             entries_to_dump = [
                 entry
                 for entry in self.entries
-                if entry.metadata.selection and entry.metadata.selection.diff_after_address_change
+                if entry.metadata.selection
+                and entry.metadata.selection.diff_after_address_change
+                and entry.metadata.is_covered
             ]
         elif type_ in {OutputType.FULL, OutputType.WEBAPP} and remove_non_suggesting:
             entries_to_dump = [
@@ -209,8 +213,43 @@ class Dataset:
             if type_ == OutputType.CODE_REFINEMENT:
                 return CodeRefinementEntry.from_entry(entry).__dict__
 
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(to_dump, f, default=transform_entry, indent=4)
+        if verbose:
+            print(f"{len(to_dump.entries)} entries...", end=" ", flush=True, file=sys.stderr)
+        json_data = json.dumps(to_dump, default=transform_entry, indent=4)
+
+        if type_ == OutputType.COMMENT_GEN or type_ == OutputType.CODE_REFINEMENT:
+            dirname = os.path.dirname(filename)
+            basename = os.path.basename(filename)
+            start, *middle, _ = basename.split('.')
+            zip_name = '.'.join(
+                [start + ('_with_context' if archives_root else '_no_context'), *middle, 'zip']
+            )
+            zip_path = os.path.join(dirname, zip_name)
+
+            with zipfile.ZipFile(zip_path, 'w') as zf:
+                zf.writestr(type_.value + "_input.json", json_data)
+
+                if archives_root:
+                    for entry in to_dump.entries:
+                        archive_src_name = entry.metadata.archive_name(ArchiveState.BASE)
+                        archive_path = os.path.join(archives_root, archive_src_name)
+                        if not os.path.exists(archive_path):
+                            print(
+                                f"[ERROR] The archive {archive_src_name} ({entry.metadata.repo} #{entry.metadata.pr_number}) is not present in {archives_root}. Couldn't add it to the dataset",
+                                file=sys.stderr,
+                            )
+                            continue
+                        archive_dest_name = entry.metadata.archive_name(
+                            ArchiveState.BASE, only_id=True
+                        ).replace("_base", "")
+                        with open(archive_path, 'rb') as archive_content:
+                            zf.writestr(
+                                os.path.join("context", archive_dest_name),
+                                archive_content.read(),
+                            )
+        else:
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(json_data)
 
     @staticmethod
     def from_json(filename: str, keep_still_in_progress: bool = False) -> "Dataset":
@@ -298,7 +337,7 @@ if __name__ == "__main__":
         "--output",
         type=str,
         default="output.json",
-        help="Path to the output JSON file",
+        help="Path to the output JSON file. Default 'output.json'",
     )
     parser.add_argument(
         "-p",
@@ -312,7 +351,13 @@ if __name__ == "__main__":
         type=OutputType,
         default=OutputType.FULL,
         action=EnumChoicesAction,
-        help="Type of output to generate. webapp is just to keep what's necessary for the webapp to run, i.e. the metadata and the comments.",
+        help=f"Type of output to generate. Note that for the {OutputType.COMMENT_GEN.value} or {OutputType.CODE_REFINEMENT.value} types, the resulting file will be a compressed archive with the data and a '.zip' will be replace the output extension. {OutputType.WEBAPP.value} is just to keep what's necessary for the webapp to run, i.e. the metadata and the comments.",
+    )
+    parser.add_argument(
+        "-a",
+        "--archives",
+        type=str,
+        help=f"Path to the root directory where the archives are present. Relevant only for {OutputType.COMMENT_GEN.value} or {OutputType.CODE_REFINEMENT.value}. If given, then the relevant archives are added to the resulting zipped dataset and the string '_with_context' will be added to the filename, before the extension. If not given, then the string '_no_context' will be added to the filename",
     )
     parser.add_argument(
         "--remove-non-suggesting",
@@ -338,5 +383,11 @@ if __name__ == "__main__":
             print("Exiting without saving.")
             exit(0)
     print(f"Saving dataset to {args.output},", end=" ", flush=True)
-    dataset.to_json(args.output, args.output_type, args.remove_non_suggesting)
+    dataset.to_json(
+        args.output,
+        args.output_type,
+        args.archives,
+        args.remove_non_suggesting,
+        verbose=True,
+    )
     print("Done")
