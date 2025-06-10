@@ -4,6 +4,7 @@ import os, json, tarfile, argparse
 from typing import Optional
 from dataset import Dataset, ArchiveState
 from utils import EnumChoicesAction
+from tqdm import tqdm
 
 
 class OutputType(Enum):
@@ -69,9 +70,9 @@ def extract_refinement_predictions(dataset_path: str, archives_path: str, output
     results = {}
 
     # Iterate over entries that address the change
-    for entry in dataset.entries:
+    for entry in tqdm(dataset.entries, unit="entries"):
         sel = entry.metadata.selection
-        if not sel or not (sel.diff_after_address_change and sel.is_code_related):
+        if not sel or not (sel.diff_after_address_change and entry.metadata.is_code_related):
             continue
         entry_id = entry.metadata.id
 
