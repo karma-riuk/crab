@@ -80,11 +80,11 @@ python pull_requests.py [CSV_FILE] [options]
 | Parameter | Type | Default | Required | Description |
 | ----------------------------- | ------- | --------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
 | `CSV_FILE` | string | — | Yes | The CSV file containing the list of GitHub repos to process. |
-| `-o`, `--output` | string | `./dataset.json` | No | Path where the resulting JSON dataset will be saved. |
-| `-r`, `--repos` | string | `./results/` | No | Directory under which repos will be (or already are) cloned. |
-| `-c`, `--cache` | string | *None* | No | Path to a previous run’s JSON output to resume from (caches processed PRs). |
-| `-a`, `--archive-destination` | string | `./dataset/archives` | No | Directory where per-PR archives (tar.gz) will be stored. |
-| `-s`, `--sort-by` | string | *None* | No | Column name in the CSV by which to sort repos before processing. |
+| `-o`, <br>`--output` | string | `./dataset.json` | No | Path where the resulting JSON dataset will be saved. |
+| `-r`, <br>`--repos` | string | `./results/` | No | Directory under which repos will be (or already are) cloned. |
+| `-c`, <br>`--cache` | string | *None* | No | Path to a previous run’s JSON output to resume from (caches processed PRs). |
+| `-a`, <br>`--archive-destination` | string | `./dataset/archives` | No | Directory where per-PR archives (tar.gz) will be stored. |
+| `-s`, <br>`--sort-by` | string | *None* | No | Column name in the CSV by which to sort repos before processing. |
 | `--only-repo` | string | *None* | No | Process only the specified repo (format: `owner/name`), ignoring all others in the CSV. |
 | `--cache-requests` | flag | `false` | No | If set, caches GitHub API requests (using `requests_cache`) to speed up reruns at the risk of stale data. |
 | `--max-workers` | integer | *None* (monothreaded) | No | Number of parallel workers for processing repos. If omitted, the script runs in a single thread. |
@@ -127,9 +127,9 @@ python manual_selection.py [DATASET_FILE] -o OUTPUT [options]
 | Parameter | Type | Default | Required | Description |
 | ------------------------ | --------------------- | --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATASET_FILE` | string | — | Yes | Path to the dataset JSON file to process. |
-| `-o`, `--output` | string | — | Yes | Path where the resulting dataset (after manual selection/refinement) will be written. |
+| `-o`, <br>`--output` | string | — | Yes | Path where the resulting dataset (after manual selection/refinement) will be written. |
 | `--overwrite` | flag | *false* | No | If set, re-evaluates and overwrites any existing `Selection` entries in the dataset. |
-| `-m`, `--mode` | `ValidationMode` enum | `comment` | No | Validation mode to run in:<br> • `comment` – only check if comments suggest a change.<br> • `refinement` – check comment suggestions and whether diffs implement them. |
+| `-m`, <br>`--mode` | `ValidationMode` enum | `comment` | No | Validation mode to run in:<br> • `comment` – only check if comments suggest a change.<br> • `refinement` – check comment suggestions and whether diffs implement them. |
 | `--check-diff-relevance` | flag | *false* | No | If set (only in `refinement` mode), first ask whether each diff is related to the comment before prompting for refinement. |
 
 ### 3. Serialize to JSON for modeling
@@ -147,10 +147,10 @@ python dataset.py [FILENAME] [options]
 | Parameter | Type | Default | Required | Description |
 | ------------------------- | ----------------- | ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `FILENAME` | string | — | Yes | Path to the dataset JSON file to load. |
-| `-o`, `--output` | string | `output.json` | No | Path where the processed dataset (or archive) will be saved. |
-| `-p`, `--paraphrases` | string | *None* | No | CSV file containing generated paraphrases. Must include a `paraphrases` column with lines of the form `Paraphrase#N: <text>`. When provided, each paraphrase will be scored and (optionally) appended to its comment. |
-| `-t`, `--output_type` | `OutputType` enum | `full` | No | Type of output to generate: <br> • `full` – dump the entire dataset as JSON.<br> • `comment_gen` – dump only entries whose comments suggest changes, as a ZIP of JSON (with `_with_context` or `_no_context`).<br> • `code_refinement` – dump entries both covered and addressed, as a ZIP.<br> • `webapp` – dump minimal fields for webapp. |
-| `-a`, `--archives` | string | *None* | No | Root directory where per-PR archives (tar.gz) live. Relevant only for `comment_gen` or `code_refinement` outputs; will be bundled into the ZIP under `context/`. |
+| `-o`, <br>`--output` | string | `output.json` | No | Path where the processed dataset (or archive) will be saved. |
+| `-p`, <br>`--paraphrases` | string | *None* | No | CSV file containing generated paraphrases. Must include a `paraphrases` column with lines of the form `Paraphrase#N: <text>`. When provided, each paraphrase will be scored and (optionally) appended to its comment. |
+| `-t`, <br>`--output_type` | `OutputType` enum | `full` | No | Type of output to generate: <br> • `full` – dump the entire dataset as JSON.<br> • `comment_gen` – dump only entries whose comments suggest changes, as a ZIP of JSON (with `_with_context` or `_no_context`).<br> • `code_refinement` – dump entries both covered and addressed, as a ZIP.<br> • `webapp` – dump minimal fields for webapp. |
+| `-a`, <br>`--archives` | string | *None* | No | Root directory where per-PR archives (tar.gz) live. Relevant only for `comment_gen` or `code_refinement` outputs; will be bundled into the ZIP under `context/`. |
 | `--remove-non-suggesting` | flag | *false* | No | When output type is `full`, drop entries whose comments do *not* suggest a change. |
 
 ### Examples
@@ -200,9 +200,9 @@ python extract_correct_predictions.py DATASET_JSON [options]
 | Parameter | Type | Default | Required | Description |
 | --------------------- | ----------------- | ------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATASET_JSON` | string | — | Yes | Path to the dataset JSON to process. |
-| `-o`, `--output` | string | `exact_predictions_<type>.json` | No | Path for the output JSON file. If omitted, defaults to `exact_predictions_<output-type>.json`. |
-| `-a`, `--archives` | string | — | Only for `code_refinement` | Directory where per-PR tar.gz archives live. Required when `--output-type=code_refinement` so merged file contents can be extracted. |
-| `-t`, `--output-type` | `OutputType` enum | `comment_gen` | No | Which extraction to perform:<br> • `comment_gen` – pull file+location+body for commenting tasks.<br> • `code_refinement` – extract post-merge file contents for code tasks.<br> • `paraphrases` – dump comments+before-PR files for paraphrase creation. |
+| `-o`, <br>`--output` | string | `exact_predictions_<type>.json` | No | Path for the output JSON file. If omitted, defaults to `exact_predictions_<output-type>.json`. |
+| `-a`, <br>`--archives` | string | — | Only for `code_refinement` | Directory where per-PR tar.gz archives live. Required when `--output-type=code_refinement` so merged file contents can be extracted. |
+| `-t`, <br>`--output-type` | `OutputType` enum | `comment_gen` | No | Which extraction to perform:<br> • `comment_gen` – pull file+location+body for commenting tasks.<br> • `code_refinement` – extract post-merge file contents for code tasks.<br> • `paraphrases` – dump comments+before-PR files for paraphrase creation. |
 
 ### OutputType Values
 
