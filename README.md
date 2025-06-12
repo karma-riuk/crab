@@ -48,7 +48,7 @@ CRAB focuses on **Java** projects, rigorously curating pull-request â€œtripletsâ
    cd crab
    ```
 
-1. *(Optional)* **Creae Python Environement**
+1. *(Optional)* **Create Python Environement**
 
    ```bash
    python -m venv .venv
