@@ -54,10 +54,6 @@ CRAB focuses on **Java** projects, rigorously curating pull-request â€œtripletsâ
    pip install -r requirements.txt
    ```
 
-   The pipeline depends on:
-
-   - `pandas`, `tqdm`, `docker`, `beautifulsoup4`, `unidiff`, `PyGithub`, `javalang`&#32;
-
 1. **Docker images**
 
    The repository includes two Dockerfiles (`maven.Dockerfile` and `gradle.Dockerfile`) at its root. Build the images locally from this directory:
