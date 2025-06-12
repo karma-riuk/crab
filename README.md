@@ -151,8 +151,8 @@ python dataset.py [FILENAME] [options]
 | - | - | - | - |
 | `FILENAME` | — | Yes | Path to the dataset JSON file to load. |
 | `-o`, <br>`--output` | `output.json` | No | Path where the processed dataset (or archive) will be saved. |
-| `-p`, `--paraphrases` | *None* | No | CSV file containing generated paraphrases. Must include a `paraphrases` column with lines of the form `Paraphrase#N: <text>`. When provided, each paraphrase will be scored and (optionally) appended to its comment. |
-| `-t`, `--output_type` | `full` | No | Type of output to generate: <br> • `full` – dump the entire dataset as JSON.<br> • `comment_gen` – dump only entries whose comments suggest changes, as a ZIP of JSON (with `_with_context` or `_no_context`).<br> • `code_refinement` – dump entries both covered and addressed, as a ZIP.<br> • `webapp` – dump minimal fields for webapp. |
+| `-p`, <br>`--paraphrases` | *None* | No | CSV file containing generated paraphrases. Must include a `paraphrases` column with lines of the form `Paraphrase#N: <text>`. When provided, each paraphrase will be scored and (optionally) appended to its comment. |
+| `-t`, <br>`--output_type` | `full` | No | Type of output to generate: <br> • `full` – dump the entire dataset as JSON.<br> • `comment_gen` – dump only entries whose comments suggest changes, as a ZIP of JSON (with `_with_context` or `_no_context`).<br> • `code_refinement` – dump entries both covered and addressed, as a ZIP.<br> • `webapp` – dump minimal fields for webapp. |
 | `-a`, <br>`--archives` | *None* | No | Root directory where per-PR archives (tar.gz) live. Relevant only for `comment_gen` or `code_refinement` outputs; will be bundled into the ZIP under `context/`. |
 | `--remove-non-suggesting` | *false* | No | When output type is `full`, drop entries whose comments do *not* suggest a change. |
 
