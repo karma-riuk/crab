@@ -13,8 +13,6 @@ CRAB focuses on **Java** projects, rigorously curating pull-request “triplets�
 - **reviewer_comment** (validated natural-language feedback, with paraphrases)
 - **revised_code** (post-review implementation, validated via tests)&#32;
 
-______________________________________________________________________
-
 ## Features
 
 - **Automated Extraction Pipeline** (`pull_requests.py`)
@@ -41,8 +39,6 @@ ______________________________________________________________________
   - **`handlers.py`**: abstract and concrete build/test handlers (Maven, Gradle)
   - **`utils.py`**: Git/GitHub helpers, BLEU-based paraphrase filtering, logging
 
-______________________________________________________________________
-
 ## Installation
 
 1. **Clone this repository**
@@ -68,8 +64,6 @@ ______________________________________________________________________
 
      - `crab-maven` (for Maven projects)
      - `crab-gradle` (for Gradle projects)
-
-______________________________________________________________________
 
 ## Usage
 
@@ -253,8 +247,6 @@ python extract_correct_predictions.py data/dataset.json \
 ```
 
 This dumps comment bodies plus “before-PR” file snapshots for all entries suggesting changes, suitable for paraphrase modeling.
-
-______________________________________________________________________
 
 ## Contributing
 
