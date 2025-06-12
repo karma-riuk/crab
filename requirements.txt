@@ -1,7 +1,10 @@
-pandas
-tqdm
-docker
-beautifulsoup4
-unidiff
 PyGithub
+beautifulsoup4
+click
+docker
 javalang
+pandas
+requests_cache
+sacrebleu
+tqdm
+unidiff
