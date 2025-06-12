@@ -44,7 +44,7 @@ CRAB focuses on **Java** projects, rigorously curating pull-request “triplets�
 1. **Clone this repository**
 
    ```bash
-   git clone https://github.com/your-org/crab
+   git clone https://github.com/karma-riuk/crab
    cd crab
    ```
 
@@ -78,7 +78,7 @@ python pull_requests.py [CSV_FILE] [options]
 ### Options
 
 | Parameter | Type | Default | Required | Description |
-| ----------------------------- | ------- | --------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| - | - | - | - | - |
 | `CSV_FILE` | string | — | Yes | The CSV file containing the list of GitHub repos to process. |
 | `-o`, <br>`--output` | string | `./dataset.json` | No | Path where the resulting JSON dataset will be saved. |
 | `-r`, <br>`--repos` | string | `./results/` | No | Directory under which repos will be (or already are) cloned. |
@@ -125,7 +125,7 @@ python manual_selection.py [DATASET_FILE] -o OUTPUT [options]
 ### Options
 
 | Parameter | Type | Default | Required | Description |
-| ------------------------ | --------------------- | --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| - | - | - | - | - |
 | `DATASET_FILE` | string | — | Yes | Path to the dataset JSON file to process. |
 | `-o`, <br>`--output` | string | — | Yes | Path where the resulting dataset (after manual selection/refinement) will be written. |
 | `--overwrite` | flag | *false* | No | If set, re-evaluates and overwrites any existing `Selection` entries in the dataset. |
@@ -145,7 +145,7 @@ python dataset.py [FILENAME] [options]
 ### Options
 
 | Parameter | Type | Default | Required | Description |
-| ------------------------- | ----------------- | ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| - | - | - | - | - |
 | `FILENAME` | string | — | Yes | Path to the dataset JSON file to load. |
 | `-o`, <br>`--output` | string | `output.json` | No | Path where the processed dataset (or archive) will be saved. |
 | `-p`, <br>`--paraphrases` | string | *None* | No | CSV file containing generated paraphrases. Must include a `paraphrases` column with lines of the form `Paraphrase#N: <text>`. When provided, each paraphrase will be scored and (optionally) appended to its comment. |
@@ -198,7 +198,7 @@ python extract_correct_predictions.py DATASET_JSON [options]
 ### Options
 
 | Parameter | Type | Default | Required | Description |
-| --------------------- | ----------------- | ------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| - | - | - | - | - |
 | `DATASET_JSON` | string | — | Yes | Path to the dataset JSON to process. |
 | `-o`, <br>`--output` | string | `exact_predictions_<type>.json` | No | Path for the output JSON file. If omitted, defaults to `exact_predictions_<output-type>.json`. |
 | `-a`, <br>`--archives` | string | — | Only for `code_refinement` | Directory where per-PR tar.gz archives live. Required when `--output-type=code_refinement` so merged file contents can be extracted. |
@@ -207,7 +207,7 @@ python extract_correct_predictions.py DATASET_JSON [options]
 ### OutputType Values
 
 | Name | Value | Meaning |
-| ----------------- | ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| - | - | - |
 | `COMMENT_GEN` | `comment_gen` | Extracts predicted comment locations & bodies to feed a comment‐generation model. |
 | `CODE_REFINEMENT` | `code_refinement` | Extracts merged file snapshots for entries that both cover and address changes, to feed a refinement model. |
 | `FOR_PARAPHRASES` | `paraphrases` | Extracts original comments plus “before-PR” file contents for paraphrase generation. |
