@@ -72,7 +72,11 @@ def extract_refinement_predictions(dataset_path: str, archives_path: str, output
     # Iterate over entries that address the change
     for entry in tqdm(dataset.entries, unit="entries"):
         sel = entry.metadata.selection
-        if not sel or not (sel.diff_after_address_change and entry.metadata.is_code_related):
+        if not sel or not (
+            sel.diff_after_address_change
+            and entry.metadata.is_code_related
+            and entry.metadata.is_covered
+        ):
             continue
         entry_id = entry.metadata.id
 
