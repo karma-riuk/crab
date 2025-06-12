@@ -94,8 +94,6 @@ python pull_requests.py [CSV_FILE] [options]
 | `--cache-requests` | flag | `false` | No | If set, caches GitHub API requests (using `requests_cache`) to speed up reruns at the risk of stale data. |
 | `--max-workers` | integer | *None* (monothreaded) | No | Number of parallel workers for processing repos. If omitted, the script runs in a single thread. |
 
-````
-
 **Example**
 
 ```sh
@@ -105,7 +103,7 @@ python pull_requests.py my_repos.csv \
   --archive-destination=./archives/ \
   --cache-requests \
   --max-workers=4
-````
+```
 
 This will:
 
