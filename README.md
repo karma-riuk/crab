@@ -60,10 +60,15 @@ CRAB focuses on **Java** projects, rigorously curating pull-request â€œtripletsâ
 
 1. **Docker images**
 
-   - Build or pull the two images used by the handlers:
+   The repository includes two Dockerfiles (`maven.Dockerfile` and `gradle.Dockerfile`) at its root. Build the images locally from this directory:
 
-     - `crab-maven` (for Maven projects)
-     - `crab-gradle` (for Gradle projects)
+   ```bash
+   # Build the Maven handler image
+   docker build -f maven.Dockerfile -t crab-maven .
+
+   # Build the Gradle handler image
+   docker build -f gradle.Dockerfile -t crab-gradle .
+   ```
 
 ## Usage
 
