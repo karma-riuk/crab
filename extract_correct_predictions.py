@@ -16,8 +16,8 @@ class OutputType(Enum):
 @dataclass
 class CommentGenSubmission:
     path: str
-    line_from: int
-    line_to: Optional[int]
+    from_: int
+    to: Optional[int]
     body: str
 
 
@@ -52,8 +52,8 @@ def extract_comment_predictions(dataset_path: str, output_path: str):
         if sel and sel.comment_suggests_change:
             results[entry.metadata.id] = CommentGenSubmission(
                 path=entry.comments[0].file,
-                line_from=entry.comments[0].from_,
-                line_to=entry.comments[0].to,
+                from_=entry.comments[0].from_,
+                to=entry.comments[0].to,
                 body=entry.comments[0].body,
             )
 
